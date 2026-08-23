@@ -48,9 +48,8 @@ Extra (observed):
 ## 4. Version & deploy workflow (CRITICAL — every code/web change)
 
 1. Bump version by 1 — footer tag `vN`. Increment each change.
-2. Build, commit, push (branch: whatever the first working session creates; PR if none).
+2. Build, commit, push (branch `main`; PR if none).
 3. Give ONE live link, every time: `https://rawcdn.githack.com/marklevi7/alfi-teachers/{full-SHA}/dist/index.html`
-   (repo name `alfi-teachers` is a proposal pending Mark's confirmation — see open questions in TASKS.md)
 4. Triple-check the link loads (200 + renders) before sending.
 5. One link per response. Nothing else. No change list, no explanation.
 6. No PNG screenshots in chat — he wants the live, tappable app link. (Screenshots are for your QA only.)
@@ -82,8 +81,7 @@ Note: the app's built-in "Preview" only works in local sessions, not remote/web.
 
 ## 8. Branch rules
 
-- Dev branch: whatever the first working session creates. Never push main unless told.
-- After push, create PR if none exists.
+- Dev branch: `main`. This repo has no protected/production branch split yet — main is where work lands until told otherwise.
 
 ## 9. Project facts
 
@@ -91,7 +89,7 @@ Note: the app's built-in "Preview" only works in local sessions, not remote/web.
 - MUI v5.14, React + Vite, Emotion with RTL cache (`stylis` + `stylis-plugin-rtl@^2`). Single-file build (`vite-plugin-singlefile`).
 - Fonts: Fredoka (logo wordmark + headings), MUI default Roboto for body text. Loaded via Google Fonts in `index.html`.
 - Accessibility target: WCAG 2.0 A/AA (Israeli SI 5568). See `docs/`.
-- GitHub: `marklevi7/alfi-teachers` (proposed, not yet created — confirm with Mark before first push). Figma: verify `whoami` = marklevi7@gmail.com before building.
+- GitHub: `marklevi7/alfi-teachers` (public). Figma: verify `whoami` = marklevi7@gmail.com before building.
 
 ## 10. Sibling project
 
