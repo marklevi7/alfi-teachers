@@ -23,43 +23,76 @@ import {
 // elevation, no `variant`, borderRadius 4, theme.shadows[8].
 const heroCardSx = { borderRadius: 2, boxShadow: (t: Theme) => t.shadows[8], height: '100%' } as const;
 
-const CHART_HEIGHT = 160;
+// One horizontal bar: a full-width track with the fill growing from the inline start
+// (right, in RTL), and the value pinned after it.
+type BarColor = string | ((t: Theme) => string);
 
+function MetricBar({
+  value, barColor, height, showValue = true,
+}: { value: number; barColor: BarColor; height: number; showValue?: boolean }) {
+  return (
+    <Box sx={{ display: 'grid', gridTemplateColumns: '1fr auto', columnGap: 1, alignItems: 'center' }}>
+      {/* no track behind the bar — the fill alone carries the value */}
+      <Box
+        className="bar"
+        sx={{
+          width: `${value}%`, height, borderRadius: 0.5, bgcolor: barColor,
+          transition: (t) => t.transitions.create('opacity'),
+        }}
+      />
+      {/* the value column keeps its width either way, so both bars stay the same length */}
+      <Typography variant="caption" sx={{ fontWeight: 700, minWidth: 30, textAlign: 'end' }}>
+        {showValue ? value : ''}
+      </Typography>
+    </Box>
+  );
+}
+
+// submission % is the secondary metric, so it stays a pale tint of the token
+const SCORE_COLOR: BarColor = 'primary.main';
+const SUBMISSION_COLOR: BarColor = (t: Theme) => alpha(t.palette.info.main, 0.28);
+const PRACTICE_LEGEND: { label: string; barColor: BarColor }[] = [
+  { label: 'ציון ממוצע', barColor: SCORE_COLOR },
+  { label: 'אחוז הגשה', barColor: SUBMISSION_COLOR },
+];
+
+// Sideways bars so each practice name gets a full row and never truncates.
 function RecentPracticesCard() {
   return (
     <Card sx={heroCardSx}>
-      <CardContent sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
-        <Stack direction="row" spacing={1.5} alignItems="center" justifyContent="flex-start" sx={{ mb: 3 }}>
+      <CardContent sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column', '&:last-child': { pb: 2 } }}>
+        <Stack direction="row" spacing={1.5} alignItems="center" justifyContent="flex-start" sx={{ mb: 1.5 }}>
           <ShowChartRounded sx={{ color: 'primary.main' }} />
           <Typography variant="h6" sx={{ ...FREDOKA, fontWeight: 600 }}>
             תרגולים אחרונים
           </Typography>
         </Stack>
 
-        <Stack direction="row" spacing={2} alignItems="flex-end" justifyContent="center" sx={{ flexGrow: 1, px: 1 }}>
+        <Stack spacing={1} sx={{ flexGrow: 1 }}>
           {RECENT_PRACTICES.map((p, i) => (
-            <Stack key={i} alignItems="center" spacing={1} sx={{ minWidth: 0, flex: 1, maxWidth: 88 }}>
-              <Typography variant="caption" color="text.secondary">
-                {p.submissionRate}% הגשה
-              </Typography>
-              <Box
-                sx={{
-                  width: '100%', maxWidth: 40, height: CHART_HEIGHT, display: 'flex', alignItems: 'flex-end',
-                  cursor: 'pointer', '&:hover .bar': { opacity: 0.8 },
-                }}
-                // pending: a per-practice review screen to land on
-                role="img"
-                aria-label={`${p.title}, ציון ממוצע ${p.avgScore}`}
-              >
-                <Box
-                  className="bar"
-                  sx={{ width: '100%', height: `${p.avgScore}%`, borderRadius: 1, bgcolor: 'primary.main', transition: (t) => t.transitions.create('opacity') }}
-                />
-              </Box>
-              <Typography variant="caption" sx={{ fontWeight: 700 }}>{p.avgScore}</Typography>
-              <Typography variant="caption" color="text.secondary" noWrap sx={{ maxWidth: '100%' }}>
+            <Box
+              key={i}
+              // pending: a per-practice review screen to land on
+              sx={{ cursor: 'pointer', '&:hover .bar': { opacity: 0.8 } }}
+              role="img"
+              aria-label={`${p.title}, ציון ממוצע ${p.avgScore}, ${p.submissionRate}% הגשה`}
+            >
+              <Typography variant="caption" sx={{ fontWeight: 600, display: 'block' }}>
                 {p.title}
               </Typography>
+              <Stack spacing={0}>
+                <MetricBar value={p.avgScore} barColor={SCORE_COLOR} height={14} />
+                <MetricBar value={p.submissionRate} barColor={SUBMISSION_COLOR} height={7} showValue={false} />
+              </Stack>
+            </Box>
+          ))}
+        </Stack>
+
+        <Stack direction="row" spacing={2} sx={{ mt: 1.5 }}>
+          {PRACTICE_LEGEND.map((l) => (
+            <Stack key={l.label} direction="row" spacing={0.75} alignItems="center">
+              <Box sx={{ width: 10, height: 10, borderRadius: 0.5, bgcolor: l.barColor }} />
+              <Typography variant="caption" color="text.secondary">{l.label}</Typography>
             </Stack>
           ))}
         </Stack>
@@ -86,12 +119,12 @@ function ActivityPieCard() {
         <Stack sx={{ flexGrow: 1 }} alignItems="center" justifyContent="center" spacing={2}>
           <Box
             sx={{
-              width: 140, height: 140, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+              width: 190, height: 190, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
               background: (t) => `conic-gradient(${t.palette.primary.main} 0deg ${activePct}deg, ${alpha(t.palette.text.primary, 0.15)} ${activePct}deg 360deg)`,
             }}
             // clicking the inactive slice goes to מצב התלמידים
           >
-            <Box sx={{ width: 104, height: 104, borderRadius: '50%', bgcolor: 'background.paper', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Box sx={{ width: 142, height: 142, borderRadius: '50%', bgcolor: 'background.paper', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Typography sx={{ fontWeight: 800 }}>{total}</Typography>
             </Box>
           </Box>
@@ -118,7 +151,7 @@ function StudentListPanel({
   students, title, subtitle, columnLabel, valueSuffix, color,
 }: {
   students: FlaggedStudent[]; title: string; subtitle: string; columnLabel: string; valueSuffix: string;
-  color: 'error' | 'info';
+  color: 'error' | 'warning';
 }) {
   const Icon = color === 'error' ? WarningAmberRounded : AccessTimeRounded;
   return (
@@ -155,12 +188,7 @@ function StudentListPanel({
           </Typography>
           {students.map((s) => (
             <Fragment key={s.name}>
-              <Stack direction="row" spacing={1.25} alignItems="center">
-                <Avatar sx={{ width: 28, height: 28, bgcolor: (t) => alpha(t.palette[color].main, 0.15), color: `${color}.main`, fontSize: 13, fontWeight: 700 }}>
-                  {s.name[0]}
-                </Avatar>
-                <Typography variant="body2" sx={{ fontWeight: 600 }}>{s.name}</Typography>
-              </Stack>
+              <Typography variant="body2" sx={{ fontWeight: 600 }}>{s.name}</Typography>
               <Typography variant="body2" sx={{ fontWeight: 700, color: `${color}.dark`, textAlign: 'end' }}>
                 {s.value}{valueSuffix}
               </Typography>
@@ -248,7 +276,7 @@ export function MainDashboard() {
           subtitle="לא נכנסו מעל 5 ימים"
           columnLabel="לא נכנסו כבר"
           valueSuffix=" ימים"
-          color="info"
+          color="warning"
         />
       </Box>
 
