@@ -11,39 +11,51 @@ import SchoolRounded from '@mui/icons-material/SchoolRounded';
 import ShowChartRounded from '@mui/icons-material/ShowChartRounded';
 import AssignmentRounded from '@mui/icons-material/AssignmentRounded';
 import MenuBookRounded from '@mui/icons-material/MenuBookRounded';
-import DescriptionRounded from '@mui/icons-material/DescriptionRounded';
 import AssignmentTurnedInRounded from '@mui/icons-material/AssignmentTurnedInRounded';
 import LogoutRounded from '@mui/icons-material/LogoutRounded';
 import { AlfiWordmark } from '../components/AlfiWordmark';
 import { FREDOKA } from '../theme';
 
-export type Screen = 'main' | 'students' | 'build-test' | 'build-practice' | 'results' | 'tasks';
+// ניהול משימות is gone as its own screen — it merges into תוצאות הערכות, which inherits
+// its icon (decided on the 23 Aug kickoff call).
+// 'assessment-review' is a drill-in, not a nav item: it is reached by clicking a row of
+// תרגולים אחרונים, so it never appears in NAV.
+export type Screen = 'main' | 'students' | 'build-test' | 'build-practice' | 'results' | 'assessment-review';
+export type NavKey = Exclude<Screen, 'assessment-review'>;
 
-export const NAV: { key: Screen; label: string; icon: ReactNode }[] = [
+export const NAV: { key: NavKey; label: string; icon: ReactNode }[] = [
   { key: 'main', label: 'מסך ראשי', icon: <SchoolRounded /> },
   { key: 'students', label: 'מצב התלמידים', icon: <ShowChartRounded /> },
   { key: 'build-test', label: 'בניית מבחן', icon: <AssignmentRounded /> },
   { key: 'build-practice', label: 'בניית תרגול', icon: <MenuBookRounded /> },
-  { key: 'results', label: 'תוצאות הערכות', icon: <DescriptionRounded /> },
-  { key: 'tasks', label: 'ניהול משימות', icon: <AssignmentTurnedInRounded /> },
+  { key: 'results', label: 'תוצאות הערכות', icon: <AssignmentTurnedInRounded /> },
 ];
 
-const SIDEBAR_WIDTH = 320;
+const SIDEBAR_WIDTH = 240;
+// Cap the content so cards stop stretching on a wide monitor, but stay fluid below the cap
+// so a small laptop never gets a horizontal scrollbar. Every screen uses this — the width
+// behaviour is identical app-wide.
+const CONTENT_MAX_WIDTH = 1120;
 
 // Shared chrome: sidebar nav (right in RTL) + main content area.
 // Every teacher screen renders inside this via `active` / `children`.
-export function Shell({ active, onNavigate, children }: { active: Screen; onNavigate: (s: Screen) => void; children: ReactNode }) {
+export function Shell({ active, onNavigate, children }: { active: Screen; onNavigate: (s: NavKey) => void; children: ReactNode }) {
   // Only one class exists in the current data — this becomes real filtering once more classes ship.
   const [classId, setClassId] = useState('י-1');
 
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: (t) => alpha(t.palette.primary.main, 0.03) }}>
+    // The window never scrolls: the content column is the single scroller, and an RTL
+    // element puts its scrollbar on the inline end — the physical LEFT edge, which is
+    // where Mark wants it on every screen.
+    <Box sx={{ display: 'flex', height: '100%', overflow: 'hidden', bgcolor: (t) => alpha(t.palette.primary.main, 0.03) }}>
+      {/* full height beside the scroller, and never a scrollbar of its own */}
       <Box
         component="nav"
         sx={{
           width: SIDEBAR_WIDTH, flexShrink: 0, bgcolor: 'background.paper',
           display: 'flex', flexDirection: 'column',
           borderInlineStart: '1px solid', borderColor: 'divider',
+          height: '100%', overflow: 'hidden',
         }}
       >
         <Box sx={{ px: 3, pt: 4, pb: 2 }}>
@@ -101,8 +113,13 @@ export function Shell({ active, onNavigate, children }: { active: Screen; onNavi
         </List>
       </Box>
 
-      <Box component="main" sx={{ flexGrow: 1, p: 6, overflow: 'auto' }}>
-        {children}
+      {/* The one and only scrollbar in the app. A scroll container insets sticky children
+          by its own padding, so the vertical padding lives on the column inside instead —
+          otherwise a sticky table header parks 48px down and rows show through the gap. */}
+      <Box component="main" sx={{ flexGrow: 1, minWidth: 0, height: '100%', overflowY: 'auto', px: 6 }}>
+        <Box sx={{ maxWidth: CONTENT_MAX_WIDTH, mx: 'auto', py: 6 }}>
+          {children}
+        </Box>
       </Box>
     </Box>
   );

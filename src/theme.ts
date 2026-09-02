@@ -88,6 +88,23 @@ const base = {
         }),
       },
     },
+    // Sorting reads the same way everywhere: the column name on the inline start
+    // (the RIGHT, in RTL) and the sort arrow after it, on the left. MUI flips the
+    // label to row-reverse whenever a header cell is align="right", so pin the
+    // direction here instead of leaving it to each table.
+    MuiTableSortLabel: {
+      styleOverrides: {
+        root: {
+          flexDirection: 'row' as const,
+          // A sortable label always reserves room for its arrow, even while the arrow is
+          // invisible. In a centred header that centres "text + arrow", leaving the text
+          // itself half an arrow off the column's true centre — out of line with the cells
+          // below it. A mirror-width spacer on the other side balances the box.
+          // 26px = the arrow's 18px box plus its 4px margins.
+          '.MuiTableCell-alignCenter &::before': { content: '""', flexShrink: 0, width: 26 },
+        },
+      },
+    },
     // RTL at the design-system level. Layout/spacing already flip via
     // stylis-plugin-rtl + logical props. Directional glyphs (arrows, chevrons)
     // do NOT auto-mirror, so author them in LTR-forward orientation and add

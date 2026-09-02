@@ -4,10 +4,10 @@ import Button from '@mui/material/Button';
 import MenuBookRounded from '@mui/icons-material/MenuBookRounded';
 import AssignmentRounded from '@mui/icons-material/AssignmentRounded';
 import { FREDOKA } from '../theme';
-import { MainDashboard } from './MainDashboard';
+import { MainDashboard, type MainVariant } from './MainDashboard';
 
 // Placeholder greeting — real teacher name comes from auth once that's wired up.
-export function TeacherMain() {
+export function TeacherMain({ variant = 'mid', onOpenAssessment }: { variant?: MainVariant; onOpenAssessment: (i: number) => void }) {
   return (
     <Stack spacing={4}>
       <Stack direction="row" justifyContent="space-between" alignItems="center">
@@ -24,7 +24,7 @@ export function TeacherMain() {
         </Stack>
       </Stack>
 
-      <MainDashboard />
+      <MainDashboard variant={variant} onOpenAssessment={onOpenAssessment} />
     </Stack>
   );
 }
