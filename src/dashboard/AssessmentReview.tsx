@@ -39,6 +39,8 @@ import { deepPurple } from '@mui/material/colors';
 import { FREDOKA } from '../theme';
 import { ScoreDot, statusBorder } from './ScoreDot';
 import { KindIcon } from './KindIcon';
+import { QNumber } from './QNumber';
+import { LabeledPill, DifficultyPill } from './Pills';
 import { EmptyState } from './EmptyState';
 import {
   CLASS_SIZE, ASSESSMENT_REVIEWS, ASSESSMENT_QUESTIONS, blankAssessment, blankQuestions,
@@ -77,54 +79,9 @@ const compareBy = (key: SortKey, a: StudentResult, b: StudentResult) => {
   return (a.score ?? -1) - (b.score ?? -1);
 };
 
-// One pill, taken from the student app (Practice.tsx GradePill / ExpiredPill): white with
-// a hairline, so it reads the same on a plain card and on a tinted one.
-const PILL = {
-  height: 28, px: 1.25, borderRadius: 1.5, flexShrink: 0,
-  display: 'inline-flex', alignItems: 'center', gap: 0.75,
-  bgcolor: 'background.paper', border: 1, borderColor: 'grey.400',
-} as const;
-const PILL_TEXT = { fontSize: (t: Theme) => t.typography.body2.fontSize, fontWeight: 800, lineHeight: 1, whiteSpace: 'nowrap' } as const;
-
-const DIFFICULTY_COLOR: Record<ReviewQuestion['difficulty'], string> = {
-  קל: 'primary.dark',
-  בינוני: 'warning.dark',
-  קשה: 'error.dark',
-};
-
-// the student app's GradePill, saying which grade it is
+// the student app's GradePill, saying which grade it is — a dash until anything is measured
 function AveragePill({ value }: { value: number | null }) {
-  return (
-    <Box sx={PILL}>
-      <Typography component="span" sx={{ ...PILL_TEXT, color: 'text.secondary' }}>ציון ממוצע:</Typography>
-      <Typography component="span" sx={{ ...PILL_TEXT, color: 'text.primary', fontFeatureSettings: '"tnum","lnum"' }}>{value ?? '—'}</Typography>
-    </Box>
-  );
-}
-
-function DifficultyPill({ level }: { level: ReviewQuestion['difficulty'] }) {
-  return (
-    <Box sx={PILL}>
-      <Typography component="span" sx={{ ...PILL_TEXT, color: DIFFICULTY_COLOR[level] }}>{level}</Typography>
-    </Box>
-  );
-}
-
-// The numbered circle from the student app's question cards (TaskDetail.tsx QMeta), minus
-// the solved/started dots — a teacher is looking at the class, not at one student's run.
-function QNumber({ index }: { index: number }) {
-  return (
-    <Box
-      sx={{
-        width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        border: 2, borderColor: 'grey.400', color: 'text.primary',
-        fontWeight: 800, fontSize: '1.3rem', fontFeatureSettings: '"tnum","lnum"',
-      }}
-    >
-      {index + 1}
-    </Box>
-  );
+  return <LabeledPill label="ציון ממוצע" value={value ?? '—'} />;
 }
 
 // One headline number. Same card-header shape as the dashboard's bottom panels: the
@@ -568,10 +525,7 @@ function AnswerCard({ a, onOpen }: { a: QuestionAnswer; onOpen: () => void }) {
       <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 1.5 }}>
         <Typography variant="body2" sx={{ fontWeight: 700 }}>{a.name}</Typography>
         <Box sx={{ flexGrow: 1 }} />
-        <Box sx={PILL}>
-          <Typography component="span" sx={{ ...PILL_TEXT, color: 'text.secondary' }}>ציון:</Typography>
-          <Typography component="span" sx={{ ...PILL_TEXT, color: 'text.primary', fontFeatureSettings: '"tnum","lnum"' }}>{a.score}</Typography>
-        </Box>
+        <LabeledPill label="ציון" value={a.score} />
       </Stack>
       {/* a few lines of the answer, cut off mid-air so it reads as "there is more inside" */}
       <Box
@@ -632,10 +586,7 @@ function QuestionDialog({ q, index, onClose }: { q: ReviewQuestion; index: numbe
                 <Typography variant="h6" sx={{ fontWeight: 800 }}>{open.name}</Typography>
                 <Typography variant="body2" color="text.secondary">הפתרון המלא לשאלה {index + 1}</Typography>
               </Box>
-              <Box sx={PILL}>
-                <Typography component="span" sx={{ ...PILL_TEXT, color: 'text.secondary' }}>ציון:</Typography>
-                <Typography component="span" sx={{ ...PILL_TEXT, color: 'text.primary', fontFeatureSettings: '"tnum","lnum"' }}>{open.score}</Typography>
-              </Box>
+              <LabeledPill label="ציון" value={open.score} />
             </>
           ) : (
             <>
@@ -711,7 +662,9 @@ function QuestionDialog({ q, index, onClose }: { q: ReviewQuestion; index: numbe
 // 'blank' is the state right after the assessment goes out, before anyone answers.
 export type ReviewVariant = 'full' | 'blank';
 
-export function AssessmentReview({ index, variant = 'full', onBack }: { index: number; variant?: ReviewVariant; onBack: () => void }) {
+export function AssessmentReview({ index, variant = 'full', backLabel = 'חזרה למסך הראשי', onBack }: {
+  index: number; variant?: ReviewVariant; backLabel?: string; onBack: () => void;
+}) {
   const blank = variant === 'blank';
   const a = blank ? blankAssessment(ASSESSMENT_REVIEWS[index]) : ASSESSMENT_REVIEWS[index];
   const questions = blank ? blankQuestions(ASSESSMENT_QUESTIONS[index]) : ASSESSMENT_QUESTIONS[index];
@@ -740,7 +693,7 @@ export function AssessmentReview({ index, variant = 'full', onBack }: { index: n
       {/* back points right — that is "backwards" in RTL, so no dir-icon on it */}
       <Box>
         <Button onClick={onBack} variant="outlined" startIcon={<ArrowForwardRounded />}>
-          חזרה למסך הראשי
+          {backLabel}
         </Button>
       </Box>
 

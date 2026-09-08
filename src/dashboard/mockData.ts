@@ -229,9 +229,10 @@ type QuestionSeed = { prompt: string; right: string; wrong: string; avg?: number
 // one line of the replayed conversation, same shape as the student app's summary turns
 export type AnswerTurn = { from: 'student' | 'alfi'; text: string; tone?: 'ok' | 'hint' };
 export type QuestionAnswer = { name: string; score: number; text: string; correct: boolean; turns: AnswerTurn[] };
+export type Difficulty = 'קל' | 'בינוני' | 'קשה';
 export type ReviewQuestion = {
   prompt: string;
-  difficulty: 'קל' | 'בינוני' | 'קשה';
+  difficulty: Difficulty;
   avgScore: number;
   submissionRate: number;
   answers: QuestionAnswer[];
@@ -379,7 +380,7 @@ function buildTurns(text: string, right: string, score: number, i: number): Answ
   return turns;
 }
 
-const difficultyOf = (avg: number): ReviewQuestion['difficulty'] =>
+const difficultyOf = (avg: number): Difficulty =>
   (avg < 55 ? 'קשה' : avg < 70 ? 'בינוני' : 'קל');
 
 // Students drop off towards the end of an assessment, and each question sits around the
@@ -430,3 +431,175 @@ export function blankAssessment(a: AssessmentReviewData): AssessmentReviewData {
 export function blankQuestions(questions: ReviewQuestion[]): ReviewQuestion[] {
   return questions.map((q) => ({ ...q, avgScore: 0, submissionRate: 0, answers: [] }));
 }
+
+/* ---------- כל ההערכות: everything the class was ever given, plus what is queued ---------- */
+
+// 'scheduled' has not opened to the students yet, 'open' is running now, 'ended' is closed.
+export type AssessmentState = 'scheduled' | 'open' | 'ended';
+
+export type ClassAssessment = {
+  id: string;
+  title: string;
+  kind: Kind;
+  unit: string;
+  topic: string;
+  subTopic: string;
+  tags: string[];
+  opensOn: string;
+  state: AssessmentState;
+  // which סקירת הערכה this row drills into. Only the five newest have a question bank of
+  // their own; the older ones borrow one so every row still opens a full review.
+  reviewIndex: number;
+  submitted: number;
+  avgScore: number | null;
+};
+
+export const UNITS = ['5 יח"ל', '4 יח"ל'];
+export const ASSESSMENT_TAGS = ['שיעורי בית', 'הכנה למבחן', 'חזרה', 'העשרה', 'תרגול כיתה'];
+
+// title / unit / topic / subTopic / tags for each column of the מצב תלמידים table, in the
+// same order — date and kind come from STATUS_ASSESSMENTS so the two screens agree.
+const ASSESSMENT_META: { unit: string; topic: string; subTopic: string; tags: string[] }[] = [
+  { unit: '5 יח"ל', topic: 'אלגברה', subTopic: 'משוואות ריבועיות', tags: ['שיעורי בית'] },
+  { unit: '5 יח"ל', topic: 'אלגברה', subTopic: 'פרבולה', tags: ['שיעורי בית', 'חזרה'] },
+  { unit: '5 יח"ל', topic: 'אלגברה', subTopic: 'משוואות ואי-שוויונות', tags: ['הכנה למבחן'] },
+  { unit: '5 יח"ל', topic: 'סדרות', subTopic: 'סדרה חשבונית', tags: ['שיעורי בית'] },
+  { unit: '5 יח"ל', topic: 'סדרות', subTopic: 'סדרה הנדסית', tags: ['שיעורי בית'] },
+  { unit: '5 יח"ל', topic: 'סדרות', subTopic: 'סכום סדרה', tags: ['הכנה למבחן'] },
+  { unit: '4 יח"ל', topic: 'טריגונומטריה', subTopic: 'משולש ישר זווית', tags: ['תרגול כיתה'] },
+  { unit: '5 יח"ל', topic: 'אנליזה', subTopic: 'פולינום ונגזרות', tags: ['שיעורי בית', 'הכנה למבחן'] },
+  { unit: '5 יח"ל', topic: 'גאומטריה אנליטית', subTopic: 'מרחק בין נקודות', tags: ['תרגול כיתה'] },
+  { unit: '4 יח"ל', topic: 'גאומטריה', subTopic: 'מרובעים ומעגל', tags: ['הכנה למבחן'] },
+  { unit: '5 יח"ל', topic: 'גאומטריה אנליטית', subTopic: 'משוואת הישר', tags: ['שיעורי בית'] },
+  { unit: '5 יח"ל', topic: 'אנליזה', subTopic: 'חקירת פונקציה', tags: ['חזרה', 'העשרה'] },
+];
+
+// the demo is anchored on 26/08/26 — everything up to it has run, and three more are queued
+const SCHEDULED: ClassAssessment[] = [
+  {
+    id: 's1', title: 'חקירת פונקציה רציונלית', kind: 'תרגול',
+    unit: '5 יח"ל', topic: 'אנליזה', subTopic: 'חקירת פונקציה', tags: ['שיעורי בית'],
+    opensOn: '30/08/26', state: 'scheduled', reviewIndex: 4, submitted: 0, avgScore: null,
+  },
+  {
+    id: 's2', title: 'בוחן סיכום - אנליזה', kind: 'בוחן',
+    unit: '5 יח"ל', topic: 'אנליזה', subTopic: 'פולינום ונגזרות', tags: ['הכנה למבחן'],
+    opensOn: '02/09/26', state: 'scheduled', reviewIndex: 0, submitted: 0, avgScore: null,
+  },
+  {
+    id: 's3', title: 'חזרה לקראת מתכונת', kind: 'תרגול',
+    unit: '5 יח"ל', topic: 'חזרה כללית', subTopic: 'מעורב', tags: ['חזרה', 'הכנה למבחן'],
+    opensOn: '06/09/26', state: 'scheduled', reviewIndex: 3, submitted: 0, avgScore: null,
+  },
+];
+
+const yearly = (ddmm: string) => `${ddmm}/26`;
+
+const PAST: ClassAssessment[] = STATUS_ASSESSMENTS.map((a, i) => {
+  const meta = ASSESSMENT_META[i];
+  // the five newest are the ones the dashboard already reports on — take their headline
+  // numbers straight from there; the rest are counted off the מצב תלמידים column
+  const recent = RECENT_PRACTICES.findIndex((p) => p.sentOn === yearly(a.date));
+  const column = STUDENT_STATUS.map((row) => row.cells[i]);
+  const handedIn = column.filter((c) => c.status !== 'none');
+  const scores = handedIn.map((c) => c.score as number).filter((s) => s !== null);
+  return {
+    id: `a${i}`,
+    title: a.title,
+    kind: a.kind,
+    unit: meta.unit,
+    topic: meta.topic,
+    subTopic: meta.subTopic,
+    tags: meta.tags,
+    opensOn: yearly(a.date),
+    // the newest two are still taking submissions; everything older has closed
+    state: i >= STATUS_ASSESSMENTS.length - 2 ? 'open' : 'ended',
+    reviewIndex: recent >= 0 ? recent : i % RECENT_PRACTICES.length,
+    submitted: recent >= 0 ? ASSESSMENT_REVIEWS[recent].submitted : handedIn.length,
+    avgScore: recent >= 0
+      ? ASSESSMENT_REVIEWS[recent].avgScore
+      : Math.round(scores.reduce((x, y) => x + y, 0) / scores.length),
+  };
+});
+
+// newest first, and anything still queued sits above everything that has already opened
+export const CLASS_ASSESSMENTS: ClassAssessment[] = [...SCHEDULED].reverse().concat([...PAST].reverse());
+
+/* ---------- the question library: the pool a task is built from ---------- */
+
+export const QUESTION_TAGS = ['בגרות', 'חובה', 'העשרה', 'הוכחה', 'שאלה קצרה'];
+
+export type LibraryQuestion = {
+  id: string;
+  prompt: string;
+  difficulty: Difficulty;
+  unit: string;
+  topic: string;
+  subTopic: string;
+  tags: string[];
+  // which assessments this question already went out in — empty means never used
+  usedIn: string[];
+};
+
+// Everything the class has already been asked, carried over from the assessments it ran in,
+// so "used before" is a fact rather than a flag someone has to maintain.
+const USED: LibraryQuestion[] = RECENT_PRACTICES.flatMap((p, pi) => {
+  const metaIndex = STATUS_ASSESSMENTS.findIndex((a) => `${a.date}/26` === p.sentOn);
+  const meta = ASSESSMENT_META[metaIndex];
+  return ASSESSMENT_QUESTIONS[pi].map((q, qi) => ({
+    id: `u${pi}-${qi}`,
+    prompt: q.prompt,
+    difficulty: q.difficulty,
+    unit: meta.unit,
+    topic: meta.topic,
+    subTopic: meta.subTopic,
+    tags: [QUESTION_TAGS[(pi + qi) % QUESTION_TAGS.length]],
+    usedIn: [p.title],
+  }));
+});
+
+// Written and never sent — what a teacher browses for when she wants something new.
+const FRESH: LibraryQuestion[] = [
+  {
+    id: 'n1', prompt: 'נתונה הפונקציה f(x) = x⁴ − 8x² + 7.\nא. מצא את נקודות הקיצון.\nב. קבע את סוג כל נקודת קיצון.',
+    difficulty: 'קשה', unit: '5 יח"ל', topic: 'אנליזה', subTopic: 'פולינום ונגזרות', tags: ['בגרות'], usedIn: [],
+  },
+  {
+    id: 'n2', prompt: 'גזור את הפונקציה f(x) = (2x + 1)(x − 3).',
+    difficulty: 'קל', unit: '5 יח"ל', topic: 'אנליזה', subTopic: 'פולינום ונגזרות', tags: ['שאלה קצרה', 'חובה'], usedIn: [],
+  },
+  {
+    id: 'n3', prompt: 'נתונות הנקודות A(−2, 1), B(4, 9).\nמצא את אורך הקטע AB ואת אמצעו.',
+    difficulty: 'קל', unit: '5 יח"ל', topic: 'גאומטריה אנליטית', subTopic: 'מרחק בין נקודות', tags: ['חובה'], usedIn: [],
+  },
+  {
+    id: 'n4', prompt: 'מצא את משוואת המעגל שמרכזו (2, −1) ורדיוסו 5.\nבדוק אם הנקודה (5, 3) נמצאת עליו.',
+    difficulty: 'בינוני', unit: '5 יח"ל', topic: 'גאומטריה אנליטית', subTopic: 'מעגל', tags: ['בגרות'], usedIn: [],
+  },
+  {
+    id: 'n5', prompt: 'הוכח שסכום הזוויות במשולש שווה ל-180°.',
+    difficulty: 'בינוני', unit: '4 יח"ל', topic: 'גאומטריה', subTopic: 'משולשים', tags: ['הוכחה'], usedIn: [],
+  },
+  {
+    id: 'n6', prompt: 'במקבילית ABCD נתון ∠A = 70°.\nחשב את שאר הזוויות ונמק.',
+    difficulty: 'קל', unit: '4 יח"ל', topic: 'גאומטריה', subTopic: 'מרובעים ומעגל', tags: ['שאלה קצרה'], usedIn: [],
+  },
+  {
+    id: 'n7', prompt: 'סדרה חשבונית: a₁ = 4 והפרשה 3.\nמצא את האיבר ה-20 ואת סכום 20 האיברים הראשונים.',
+    difficulty: 'בינוני', unit: '5 יח"ל', topic: 'סדרות', subTopic: 'סדרה חשבונית', tags: ['חובה'], usedIn: [],
+  },
+  {
+    id: 'n8', prompt: 'בסדרה הנדסית a₁ = 3 ומנתה 2.\nמצא את סכום 8 האיברים הראשונים.',
+    difficulty: 'בינוני', unit: '5 יח"ל', topic: 'סדרות', subTopic: 'סדרה הנדסית', tags: ['בגרות'], usedIn: [],
+  },
+  {
+    id: 'n9', prompt: 'במשולש ישר זווית הניצבים הם 6 ו-8.\nחשב את היתר ואת הזווית שמול הניצב הקטן.',
+    difficulty: 'קל', unit: '4 יח"ל', topic: 'טריגונומטריה', subTopic: 'משולש ישר זווית', tags: ['חובה', 'שאלה קצרה'], usedIn: [],
+  },
+  {
+    id: 'n10', prompt: 'הוכח כי בכל מעגל, זווית היקפית שווה למחצית הזווית המרכזית הנשענת על אותה קשת.',
+    difficulty: 'קשה', unit: '5 יח"ל', topic: 'גאומטריה', subTopic: 'מרובעים ומעגל', tags: ['הוכחה', 'העשרה'], usedIn: [],
+  },
+];
+
+export const QUESTION_LIBRARY: LibraryQuestion[] = [...FRESH, ...USED];

@@ -4,6 +4,9 @@ import { Shell, NAV, type Screen, type NavKey } from './dashboard/Shell';
 import { TeacherMain } from './dashboard/TeacherMain';
 import { StudentsStatus, type StudentsVariant } from './dashboard/StudentsStatus';
 import { AssessmentReview, type ReviewVariant } from './dashboard/AssessmentReview';
+import { AllAssessments, type AllAssessmentsVariant } from './dashboard/AllAssessments';
+import { ScheduledTask } from './dashboard/ScheduledTask';
+import { CLASS_ASSESSMENTS, type ClassAssessment } from './dashboard/mockData';
 import { BlankScreen } from './dashboard/BlankScreen';
 import { ControlBar, type Device, type ScreenVariant } from './dashboard/ControlBar';
 import type { MainVariant } from './dashboard/MainDashboard';
@@ -24,12 +27,21 @@ const SCREEN_VARIANTS: Partial<Record<Screen, ScreenVariant[]>> = {
     { key: 'full', label: 'full' },
     { key: 'blank', label: 'blank' },
   ],
+  results: [
+    { key: 'mid', label: 'mid-use' },
+    { key: 'empty', label: 'blank' },
+  ],
 };
 
 export function App() {
   const [screen, setScreen] = useState<Screen>('main');
-  // which row of תרגולים אחרונים opened סקירת הערכה
+  // which row of תרגולים אחרונים opened סקירת הערכה, and where the back button returns to
   const [assessment, setAssessment] = useState(0);
+  const [reviewFrom, setReviewFrom] = useState<'main' | 'results'>('main');
+  // כל ההערכות owns real state — a delete or a duplicate has to survive leaving the screen
+  const [assessments, setAssessments] = useState<ClassAssessment[]>(CLASS_ASSESSMENTS);
+  const [scheduledId, setScheduledId] = useState<string | null>(null);
+  const scheduled = assessments.find((a) => a.id === scheduledId) ?? null;
   const [showBar, setShowBar] = useState(false);
   const [device, setDevice] = useState<Device>('desktop');
   const [variant, setVariant] = useState('mid');
@@ -75,20 +87,55 @@ export function App() {
         <Box sx={{ flexGrow: 1, minHeight: 0 }}>
           {/* סקירת הערכה has no nav item of its own — it belongs to תוצאות הערכות, so that
               item stays lit however the teacher got here */}
-          <Shell active={screen === 'assessment-review' ? 'results' : screen} onNavigate={navigate}>
+          <Shell active={screen === 'assessment-review' || screen === 'scheduled-task' ? 'results' : screen} onNavigate={navigate}>
             {screen === 'main' ? (
               <TeacherMain
                 variant={variant as MainVariant}
                 onOpenAssessment={(i) => {
                   setAssessment(i);
+                  setReviewFrom('main');
                   setScreen('assessment-review');
                   setVariant(SCREEN_VARIANTS['assessment-review']![0].key);
                 }}
               />
             ) : screen === 'assessment-review' ? (
-              <AssessmentReview index={assessment} variant={variant as ReviewVariant} onBack={() => setScreen('main')} />
+              <AssessmentReview
+                index={assessment}
+                variant={variant as ReviewVariant}
+                backLabel={reviewFrom === 'results' ? 'חזרה לכל ההערכות' : 'חזרה למסך הראשי'}
+                onBack={() => {
+                  setScreen(reviewFrom);
+                  setVariant(SCREEN_VARIANTS[reviewFrom]?.[0]?.key ?? 'mid');
+                }}
+              />
             ) : screen === 'students' ? (
               <StudentsStatus variant={variant as StudentsVariant} />
+            ) : screen === 'scheduled-task' && scheduled ? (
+              <ScheduledTask
+                task={scheduled}
+                onBack={() => setScreen('results')}
+                onSave={(next) => {
+                  setAssessments(assessments.map((a) => (a.id === next.id ? next : a)));
+                  setScreen('results');
+                }}
+                onDelete={() => {
+                  setAssessments(assessments.filter((a) => a.id !== scheduled.id));
+                  setScreen('results');
+                }}
+              />
+            ) : screen === 'results' ? (
+              <AllAssessments
+                variant={variant as AllAssessmentsVariant}
+                items={assessments}
+                onItemsChange={setAssessments}
+                onOpenScheduled={(id) => { setScheduledId(id); setScreen('scheduled-task'); }}
+                onOpenReview={(i) => {
+                  setAssessment(i);
+                  setReviewFrom('results');
+                  setScreen('assessment-review');
+                  setVariant(SCREEN_VARIANTS['assessment-review']![0].key);
+                }}
+              />
             ) : (
               <BlankScreen title={NAV.find((n) => n.key === screen)!.label} />
             )}

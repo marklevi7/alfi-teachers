@@ -18,17 +18,17 @@ import { FREDOKA } from '../theme';
 
 // ניהול משימות is gone as its own screen — it merges into תוצאות הערכות, which inherits
 // its icon (decided on the 23 Aug kickoff call).
-// 'assessment-review' is a drill-in, not a nav item: it is reached by clicking a row of
-// תרגולים אחרונים, so it never appears in NAV.
-export type Screen = 'main' | 'students' | 'build-test' | 'build-practice' | 'results' | 'assessment-review';
-export type NavKey = Exclude<Screen, 'assessment-review'>;
+// 'assessment-review' and 'scheduled-task' are drill-ins, not nav items: they are reached
+// by clicking a row, so they never appear in NAV.
+export type Screen = 'main' | 'students' | 'build-test' | 'build-practice' | 'results' | 'assessment-review' | 'scheduled-task';
+export type NavKey = Exclude<Screen, 'assessment-review' | 'scheduled-task'>;
 
 export const NAV: { key: NavKey; label: string; icon: ReactNode }[] = [
   { key: 'main', label: 'מסך ראשי', icon: <SchoolRounded /> },
   { key: 'students', label: 'מצב התלמידים', icon: <ShowChartRounded /> },
   { key: 'build-test', label: 'בניית מבחן', icon: <AssignmentRounded /> },
   { key: 'build-practice', label: 'בניית תרגול', icon: <MenuBookRounded /> },
-  { key: 'results', label: 'תוצאות הערכות', icon: <AssignmentTurnedInRounded /> },
+  { key: 'results', label: 'כל ההערכות', icon: <AssignmentTurnedInRounded /> },
 ];
 
 const SIDEBAR_WIDTH = 240;
