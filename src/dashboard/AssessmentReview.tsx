@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, type ReactNode } from 'react';
+import { useState, useRef, type ReactNode } from 'react';
 import { lighten, alpha } from '@mui/material/styles';
 import type { Theme } from '@mui/material/styles';
 import Box from '@mui/material/Box';
@@ -39,8 +39,10 @@ import { deepPurple } from '@mui/material/colors';
 import { FREDOKA } from '../theme';
 import { ScoreDot, statusBorder } from './ScoreDot';
 import { KindIcon } from './KindIcon';
+import { PageHeader, TaskTitle } from './PageHeader';
 import { QNumber } from './QNumber';
 import { LabeledPill, DifficultyPill } from './Pills';
+import { ClampedText } from './ClampedText';
 import { EmptyState } from './EmptyState';
 import {
   CLASS_SIZE, ASSESSMENT_REVIEWS, ASSESSMENT_QUESTIONS, blankAssessment, blankQuestions,
@@ -494,21 +496,8 @@ function Turn({ turn }: { turn: AnswerTurn }) {
   );
 }
 
-const PREVIEW_H = 66;
-
 /** the answer card in the list: the student app's summary card, with a preview that fades out */
 function AnswerCard({ a, onOpen }: { a: QuestionAnswer; onOpen: () => void }) {
-  const ref = useRef<HTMLDivElement | null>(null);
-  const [clipped, setClipped] = useState(false);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const measure = () => setClipped(el.scrollHeight > el.clientHeight + 1);
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [a]);
   return (
     <Paper
       component="button"
@@ -527,21 +516,14 @@ function AnswerCard({ a, onOpen }: { a: QuestionAnswer; onOpen: () => void }) {
         <Box sx={{ flexGrow: 1 }} />
         <LabeledPill label="ציון" value={a.score} />
       </Stack>
-      {/* a few lines of the answer, cut off mid-air so it reads as "there is more inside" */}
-      <Box
-        ref={ref}
-        sx={{
-          height: PREVIEW_H, overflow: 'hidden',
-          ...(clipped && {
-            maskImage: (t: Theme) => `linear-gradient(to top, transparent 0, ${t.palette.common.black} 28px)`,
-            WebkitMaskImage: (t: Theme) => `linear-gradient(to top, transparent 0, ${t.palette.common.black} 28px)`,
-          }),
+      <ClampedText
+        text={a.text}
+        textSx={{
+          fontSize: (t) => t.typography.body2.fontSize,
+          lineHeight: (t) => t.typography.body2.lineHeight,
+          color: 'text.secondary',
         }}
-      >
-        <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'pre-line', textAlign: 'start' }}>
-          {a.text}
-        </Typography>
-      </Box>
+      />
       <Stack direction="row" alignItems="center" sx={{ height: 22, mt: 1 }}>
         <Typography variant="caption" sx={{ color: 'primary.main', fontWeight: 800, marginInlineStart: 'auto' }}>
           ראה עוד
@@ -690,32 +672,11 @@ export function AssessmentReview({ index, variant = 'full', backLabel = 'חזר�
 
   return (
     <Stack spacing={3}>
-      {/* back points right — that is "backwards" in RTL, so no dir-icon on it */}
-      <Box>
-        <Button onClick={onBack} variant="outlined" startIcon={<ArrowForwardRounded />}>
-          {backLabel}
-        </Button>
-      </Box>
+      <PageHeader back={{ label: backLabel, onClick: onBack }} title={`סקירת ${a.kind}`} />
 
-      <Stack spacing={1}>
-        {/* the page title, with the kind glyph on its own line so the two line up */}
-        <Stack direction="row" spacing={2} alignItems="center">
-          <KindIcon kind={a.kind} />
-          <Typography variant="h3" sx={{ ...FREDOKA, fontWeight: 600 }}>
-            סקירת {a.kind}
-          </Typography>
-        </Stack>
-        {/* which assessment this is, a step down in size */}
-        <Stack spacing={0.25}>
-          <Typography variant="h5" sx={{ ...FREDOKA, fontWeight: 600 }}>
-            {a.title}
-          </Typography>
-          {/* the completion count has its own card below — no need to say it twice */}
-          <Typography color="text.secondary">
-            נשלח בתאריך {a.sentOn}
-          </Typography>
-        </Stack>
-      </Stack>
+      {/* which assessment this is. The completion count has its own card below, so the line
+          under the name says only when it went out */}
+      <TaskTitle icon={<KindIcon kind={a.kind} />} name={a.title} meta={`נשלח בתאריך ${a.sentOn}`} />
 
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(4, 1fr)' }, gap: 3 }}>
         {/* a plain count of what was sent — neither good news nor bad, so it wears info blue */}

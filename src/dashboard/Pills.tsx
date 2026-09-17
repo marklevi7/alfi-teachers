@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import type { Theme } from '@mui/material/styles';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
+import Chip from '@mui/material/Chip';
 import type { Difficulty } from './mockData';
 
 /**
@@ -48,4 +49,12 @@ export function DifficultyPill({ level }: { level: Difficulty }) {
       <Typography component="span" sx={{ ...PILL_TEXT, color: DIFFICULTY_COLOR[level] }}>{level}</Typography>
     </Pill>
   );
+}
+
+/**
+ * A tag is MUI's own Chip — the canonical component for exactly this. Wrapped here so one
+ * place decides what a tag looks like across the app.
+ */
+export function TagPill({ label }: { label: string }) {
+  return <Chip label={label} size="small" />;
 }

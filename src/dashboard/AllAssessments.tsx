@@ -17,14 +17,17 @@ import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import CheckRounded from '@mui/icons-material/CheckRounded';
 import ScheduleRounded from '@mui/icons-material/ScheduleRounded';
-import ContentCopyRounded from '@mui/icons-material/ContentCopyRounded';
 import DeleteOutlineRounded from '@mui/icons-material/DeleteOutlineRounded';
+import EditRounded from '@mui/icons-material/EditRounded';
 import AssignmentTurnedInRounded from '@mui/icons-material/AssignmentTurnedInRounded';
-import { FREDOKA } from '../theme';
+import { yellow } from '@mui/material/colors';
 import { KindIcon } from './KindIcon';
+import { PageHeader } from './PageHeader';
+import { LabeledPill } from './Pills';
 import { EmptyState } from './EmptyState';
+import { ConfirmDeleteDialog } from './ConfirmDialog';
 import {
-  CLASS_SIZE, UNITS, ASSESSMENT_TAGS,
+  CLASS_SIZE, sectionsOfAssessment,
   type ClassAssessment, type AssessmentState,
 } from './mockData';
 
@@ -38,14 +41,6 @@ const STATE_FILTERS: { key: StateFilter; label: string }[] = [
   { key: 'scheduled', label: 'מתוזמנים' },
   { key: 'ended', label: 'הסתיימו' },
 ];
-
-// One pill, taken from the student app (Practice.tsx GradePill): white with a hairline.
-const PILL = {
-  height: 28, px: 1.25, borderRadius: 1.5, flexShrink: 0,
-  display: 'inline-flex', alignItems: 'center', gap: 0.75,
-  bgcolor: 'background.paper', border: 1, borderColor: 'grey.400',
-} as const;
-const PILL_TEXT = { fontSize: (t: Theme) => t.typography.body2.fontSize, fontWeight: 800, lineHeight: 1, whiteSpace: 'nowrap' } as const;
 
 // One shared style for the small meta text in a card, same as the student app's META.
 const META = { fontSize: (t: Theme) => t.typography.body2.fontSize, fontWeight: 400, color: 'text.secondary' } as const;
@@ -79,10 +74,28 @@ function StateTag({ state }: { state: AssessmentState }) {
   );
 }
 
-function AssessmentRow({ a, onOpen, onDuplicate, onDelete }: {
-  a: ClassAssessment; onOpen: () => void; onDuplicate: () => void; onDelete: () => void;
+// How much of the class handed in: red under 30%, yellow to 70%, green above it.
+function CompletionBar({ submitted }: { submitted: number }) {
+  const pct = Math.round((submitted / CLASS_SIZE) * 100);
+  const color = pct < 30 ? 'error.main' : pct < 70 ? yellow[700] : 'primary.main';
+  return (
+    <Stack direction="row" spacing={1} alignItems="center" sx={{ flexShrink: 0 }}>
+      <Typography sx={META}>אחוז הגשה</Typography>
+      <Box sx={{ width: 100, height: 8, borderRadius: 1, bgcolor: (t) => alpha(t.palette.text.primary, 0.08) }}>
+        <Box sx={{ width: `${pct}%`, height: '100%', borderRadius: 1, bgcolor: color }} />
+      </Box>
+      <Typography sx={{ ...META, fontWeight: 700, color: 'text.primary', fontFeatureSettings: '"tnum","lnum"' }}>
+        {pct}%
+      </Typography>
+    </Stack>
+  );
+}
+
+function AssessmentRow({ a, onOpen, onEdit, onDelete }: {
+  a: ClassAssessment; onOpen: () => void; onEdit: () => void; onDelete: () => void;
 }) {
   const queued = a.state === 'scheduled';
+  const curriculum = [a.topic, a.subTopic, sectionsOfAssessment(a).join(', ')].filter(Boolean).join(' · ');
   return (
     <Card
       variant="outlined"
@@ -99,7 +112,9 @@ function AssessmentRow({ a, onOpen, onDuplicate, onDelete }: {
         <CardActionArea onClick={onOpen} sx={{ flex: 1, minWidth: 0, px: 3, py: 2.5 }}>
           <Stack direction="row" spacing={3} alignItems="center">
             <Box sx={{ display: 'flex', alignItems: 'center', flexShrink: 0, opacity: queued ? 0.6 : 1 }}>
-              <KindIcon kind={a.kind} />
+              {/* how far along it is, read off the tile: queued is neutral, open is an outline,
+                  ended is the filled green of the student app */}
+              <KindIcon kind={a.kind} tone={queued ? 'muted' : a.state === 'open' ? 'outlined' : 'filled'} />
             </Box>
 
             <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -112,48 +127,54 @@ function AssessmentRow({ a, onOpen, onDuplicate, onDelete }: {
                   <StateTag state={a.state} />
                 </Typography>
                 {/* grades show for a תרגול too, not only for a בוחן */}
-                {a.avgScore !== null && (
-                  <Box sx={PILL}>
-                    <Typography component="span" sx={{ ...PILL_TEXT, color: 'text.secondary' }}>ציון ממוצע:</Typography>
-                    <Typography component="span" sx={{ ...PILL_TEXT, color: 'text.primary', fontFeatureSettings: '"tnum","lnum"' }}>{a.avgScore}</Typography>
-                  </Box>
-                )}
+                {a.avgScore !== null && <LabeledPill label="ציון ממוצע" value={a.avgScore} />}
                 <Box sx={{ flexGrow: 1 }} />
+                {/* each state says the hour that matters: when it will open, when it opened,
+                    and — once it is over — when it closed */}
                 <Typography sx={{ ...META, whiteSpace: 'nowrap' }}>
-                  {queued ? 'ייפתח ב־' : 'נפתח ב־'}{a.opensOn}
+                  {a.state === 'ended'
+                    ? `נסגר ב־${a.opensOn}${a.closesAt ? ` בשעה ${a.closesAt}` : ''}`
+                    : `${queued ? 'ייפתח ב־' : 'נפתח ב־'}${a.opensOn}${a.opensAt ? ` בשעה ${a.opensAt}` : ''}`}
                 </Typography>
               </Stack>
 
-              <Stack direction="row" alignItems="center" flexWrap="wrap" useFlexGap sx={{ mt: 1.5, columnGap: 3, rowGap: 1 }}>
-                <Typography sx={META}>{a.unit} · {a.topic} · {a.subTopic}</Typography>
-                {a.tags.length > 0 && (
-                  <Typography sx={META}>{a.tags.map((t) => `#${t}`).join('  ')}</Typography>
-                )}
-                <Box sx={{ flexGrow: 1 }} />
-                <Typography sx={META}>
-                  {queued ? 'טרם נשלח' : `${a.submitted}/${CLASS_SIZE} הגישו`}
-                </Typography>
+              {/* one line, always: the bar holds its slot and the curriculum text gives way */}
+              <Stack direction="row" alignItems="center" sx={{ mt: 1.5, columnGap: 3 }}>
+                {/* נושא · יחידה · תת נושא — the same three levels the filters walk */}
+                <Tooltip title={curriculum} placement="top-start" arrow>
+                  <Typography sx={{ ...META, flex: 1, minWidth: 0 }} noWrap>
+                    {curriculum}
+                  </Typography>
+                </Tooltip>
+                {/* the bar says everything the count said, so it takes the count's slot.
+                    A task that has not opened has nothing to complete yet. */}
+                {queued
+                  ? <Typography sx={META}>טרם נשלח</Typography>
+                  : <CompletionBar submitted={a.submitted} />}
               </Stack>
+
             </Box>
           </Stack>
         </CardActionArea>
 
-        {/* actions sit at the card's inline end (its LEFT, in RTL), outside the click target */}
-        <Stack direction="row" alignItems="center" spacing={0.5} sx={{ px: 1.5, flexShrink: 0 }}>
-          <Tooltip title="שכפול משימה" placement="top" arrow>
-            <IconButton onClick={onDuplicate} aria-label={`שכפול: ${a.title}`}>
-              <ContentCopyRounded />
-            </IconButton>
-          </Tooltip>
-          {/* only a task that has not opened can still be called off */}
-          {queued && (
+        {/* Actions sit at the card's inline end (its LEFT, in RTL), outside the click target.
+            Only a queued task has any: once it is with the class, and once it is over, it
+            stands as it was sent — and the column goes away entirely rather than leaving a
+            blank strip the hover cannot reach. */}
+        {queued && (
+          <Stack direction="row" alignItems="center" spacing={0.5} sx={{ px: 1.5, flexShrink: 0 }}>
+            <Tooltip title="עריכת המשימה" placement="top" arrow>
+              <IconButton onClick={onEdit} aria-label={`עריכה: ${a.title}`}>
+                <EditRounded />
+              </IconButton>
+            </Tooltip>
             <Tooltip title="מחיקת משימה מתוזמנת" placement="top" arrow>
               <IconButton onClick={onDelete} aria-label={`מחיקה: ${a.title}`} sx={{ color: 'error.main' }}>
                 <DeleteOutlineRounded />
               </IconButton>
             </Tooltip>
-          )}
-        </Stack>
+          </Stack>
+        )}
       </Stack>
     </Card>
   );
@@ -164,108 +185,117 @@ function AssessmentRow({ a, onOpen, onDuplicate, onDelete }: {
 // כל ההערכות — every task the class was given and every one still queued, on one timeline.
 // Same shape as the student app's תמונת מצב (History.tsx): filters on top, a vertical rail
 // down the inline start with a dot per row.
-export function AllAssessments({ variant = 'mid', items: all, onItemsChange, onOpenReview, onOpenScheduled }: {
+export function AllAssessments({ variant = 'mid', items: all, onItemsChange, onOpenReview, onEditTask }: {
   variant?: AllAssessmentsVariant;
   items: ClassAssessment[];
   onItemsChange: (next: ClassAssessment[]) => void;
   onOpenReview: (reviewIndex: number) => void;
-  onOpenScheduled: (id: string) => void;
+  onEditTask: (id: string) => void;
 }) {
   // the list lives in App so a delete survives leaving the screen and coming back
   const items = variant === 'empty' ? [] : all;
   const [state, setState] = useState<StateFilter>('all');
   const [unit, setUnit] = useState('');
   const [topic, setTopic] = useState('');
-  const [subTopic, setSubTopic] = useState('');
-  const [tags, setTags] = useState<string[]>([]);
+  const [sections, setSections] = useState<string[]>([]);
+  // nothing is deleted until the teacher confirms it in the dialog
+  const [confirmDelete, setConfirmDelete] = useState<ClassAssessment | null>(null);
 
+  // the same three levels the question bank is filed under: נושא → יחידה → תת נושא, each
+  // list narrowed by the one before it
   const TOPICS = useMemo(() => uniq(items.map((i) => i.topic)), [items]);
-  const SUBTOPICS = useMemo(() => uniq(items.map((i) => i.subTopic)), [items]);
+  const UNITS_OF = useMemo(
+    () => uniq(items.filter((i) => !topic || i.topic === topic).map((i) => i.subTopic)),
+    [items, topic],
+  );
+  const SECTIONS_OF = useMemo(
+    () => uniq(items
+      .filter((i) => (!topic || i.topic === topic) && (!unit || i.subTopic === unit))
+      .flatMap((i) => sectionsOfAssessment(i))),
+    [items, topic, unit],
+  );
 
   const shown = useMemo(
     () => items.filter((a) =>
       (state === 'all' || a.state === state) &&
-      (!unit || a.unit === unit) &&
       (!topic || a.topic === topic) &&
-      (!subTopic || a.subTopic === subTopic) &&
-      // several tags can be picked at once; a task matches if it carries any of them
-      (tags.length === 0 || a.tags.some((t) => tags.includes(t)))
+      (!unit || a.subTopic === unit) &&
+      // a task matches a תת נושא if any of its questions sit under it
+      (sections.length === 0 || sectionsOfAssessment(a).some((sec) => sections.includes(sec))) &&
+      true
     ),
-    [items, state, unit, topic, subTopic, tags],
+    [items, state, topic, unit, sections],
   );
 
-  const duplicate = (a: ClassAssessment) => {
-    const copy: ClassAssessment = {
-      ...a,
-      id: `${a.id}-copy-${Date.now()}`,
-      title: `${a.title} (עותק)`,
-      state: 'scheduled',
-      submitted: 0,
-      avgScore: null,
-    };
-    // the copy has not been sent, so it joins the queue at the top of the list
-    onItemsChange([copy, ...items]);
-  };
+  // a step back up the cascade drops what was chosen below it
+  const pickTopic = (next: string) => { setTopic(next); setUnit(''); setSections([]); };
+  const pickUnit = (next: string) => { setUnit(next); setSections([]); };
+
   const remove = (id: string) => onItemsChange(items.filter((a) => a.id !== id));
 
   return (
     <Stack spacing={3}>
-      <Stack spacing={0.5}>
-        <Typography variant="h3" sx={{ ...FREDOKA, fontWeight: 600 }}>
-          כל ההערכות
-        </Typography>
-        <Typography color="text.secondary">
-          כל התרגולים והבחנים של הכיתה — מה שרץ עכשיו, מה שכבר הסתיים ומה שמתוזמן קדימה
-        </Typography>
-      </Stack>
+      <PageHeader
+        title="כל ההערכות"
+        subtitle="כל התרגולים והבחנים של הכיתה — מה שרץ עכשיו, מה שכבר הסתיים ומה שמתוזמן קדימה"
+      />
 
       {/* Same filter block as מצב תלמידים: one outlined card, everything on a single
           bottom-aligned row that wraps when it runs out of width. */}
       <Card variant="outlined" sx={{ borderRadius: 2 }}>
         <CardContent>
-          <Stack direction="row" spacing={2} alignItems="flex-end" flexWrap="wrap" useFlexGap>
+          <Stack spacing={2}>
             <ToggleButtonGroup
               size="small"
               exclusive
               value={state}
               onChange={(_, v) => v && setState(v)}
-              sx={{ height: 40, '& .MuiToggleButton-root': { fontWeight: 700, px: 2 } }}
+              sx={{ height: 40, alignSelf: 'flex-start', '& .MuiToggleButton-root': { fontWeight: 700, px: 2 } }}
             >
               {STATE_FILTERS.map((f) => (
                 <ToggleButton key={f.key} value={f.key}>{f.label}</ToggleButton>
               ))}
             </ToggleButtonGroup>
 
-            <TextField select size="small" label="יחידה" value={unit} onChange={(e) => setUnit(e.target.value)} sx={{ width: 140 }}>
-              <MenuItem value="">כל היחידות</MenuItem>
-              {UNITS.map((u) => <MenuItem key={u} value={u}>{u}</MenuItem>)}
-            </TextField>
-            <TextField select size="small" label="נושא" value={topic} onChange={(e) => setTopic(e.target.value)} sx={{ flex: 1, minWidth: 170 }}>
+            {/* the three levels stay on one line together — they are one choice, made in steps */}
+            <Stack direction="row" spacing={2} alignItems="flex-end" flexWrap="wrap" useFlexGap>
+            <TextField select size="small" label="נושא" value={topic} onChange={(e) => pickTopic(e.target.value)} sx={{ flex: 1, minWidth: 170 }}>
               <MenuItem value="">כל הנושאים</MenuItem>
               {TOPICS.map((t) => <MenuItem key={t} value={t}>{t}</MenuItem>)}
             </TextField>
-            <TextField select size="small" label="תת נושא" value={subTopic} onChange={(e) => setSubTopic(e.target.value)} sx={{ flex: 1, minWidth: 170 }}>
-              <MenuItem value="">הכל</MenuItem>
-              {SUBTOPICS.map((s) => <MenuItem key={s} value={s}>{s}</MenuItem>)}
+            {/* the hierarchy is walked in order: a יחידה only exists under a נושא */}
+            <TextField select size="small" label="יחידה" value={unit} onChange={(e) => pickUnit(e.target.value)} disabled={!topic} sx={{ flex: 1, minWidth: 170 }}>
+              <MenuItem value="">כל היחידות</MenuItem>
+              {UNITS_OF.map((u) => <MenuItem key={u} value={u}>{u}</MenuItem>)}
             </TextField>
-            {/* more than one tag can be on at a time */}
+            {/* several תתי נושא at once, as in בניית מבחן */}
             <TextField
               select
               size="small"
-              label="תגיות"
-              value={tags}
-              onChange={(e) => setTags(typeof e.target.value === 'string' ? e.target.value.split(',') : (e.target.value as unknown as string[]))}
-              SelectProps={{ multiple: true, displayEmpty: true, renderValue: (v) => (v as string[]).length ? (v as string[]).join(', ') : 'כל התגיות' }}
+              label="תת נושא"
+              disabled={!unit}
+              value={sections}
+              onChange={(e) => setSections(typeof e.target.value === 'string' ? e.target.value.split(',') : (e.target.value as unknown as string[]))}
+              SelectProps={{
+                multiple: true,
+                displayEmpty: true,
+                renderValue: (v) => {
+                  const picked = v as string[];
+                  if (picked.length === 0) return 'כל תתי הנושאים';
+                  return picked.length === 1 ? picked[0] : `${picked.length} תתי נושא נבחרו`;
+                },
+              }}
               InputLabelProps={{ shrink: true }}
               sx={{ flex: 1, minWidth: 170 }}
             >
-              {ASSESSMENT_TAGS.map((t) => (
-                <MenuItem key={t} value={t}>
-                  <Checkbox checked={tags.includes(t)} />
-                  <ListItemText primary={t} />
+              {SECTIONS_OF.map((sec) => (
+                <MenuItem key={sec} value={sec}>
+                  <Checkbox checked={sections.includes(sec)} />
+                  <ListItemText primary={sec} />
                 </MenuItem>
               ))}
             </TextField>
+            </Stack>
           </Stack>
         </CardContent>
       </Card>
@@ -296,18 +326,18 @@ export function AllAssessments({ variant = 'mid', items: all, onItemsChange, onO
                     bgcolor: 'background.paper',
                     ...(a.state === 'ended' && { bgcolor: 'primary.main' }),
                     ...(a.state === 'open' && { border: 2, borderColor: 'primary.main' }),
-                    ...(a.state === 'scheduled' && { border: 2, borderColor: 'grey.400' }),
                   }}
                 >
                   {a.state === 'ended' && <CheckRounded sx={{ fontSize: 16, color: 'common.white' }} />}
-                  {a.state === 'scheduled' && <ScheduleRounded sx={{ fontSize: 14, color: 'grey.500' }} />}
+                  {/* the clock IS the dot: it fills the slot, with no ring drawn around it */}
+                  {a.state === 'scheduled' && <ScheduleRounded sx={{ fontSize: 24, color: 'grey.500' }} />}
                 </Box>
                 <AssessmentRow
                   a={a}
                   // a queued task opens its form; one that already went out opens its review
-                  onOpen={() => (a.state === 'scheduled' ? onOpenScheduled(a.id) : onOpenReview(a.reviewIndex))}
-                  onDuplicate={() => duplicate(a)}
-                  onDelete={() => remove(a.id)}
+                  onOpen={() => (a.state === 'scheduled' ? onEditTask(a.id) : onOpenReview(a.reviewIndex))}
+                  onEdit={() => onEditTask(a.id)}
+                  onDelete={() => setConfirmDelete(a)}
                 />
               </Box>
             ))}
@@ -315,6 +345,15 @@ export function AllAssessments({ variant = 'mid', items: all, onItemsChange, onO
         </Box>
       )}
 
+      {confirmDelete && (
+        <ConfirmDeleteDialog
+          title={`למחוק את ${confirmDelete.kind === 'בוחן' ? 'הבוחן' : 'התרגול'}?`}
+          body={`"${confirmDelete.title}" יימחק על כל שאלותיו ולא ניתן יהיה לשחזר אותו. המשימה לא תישלח לתלמידים.`}
+          confirmLabel="מחיקה"
+          onConfirm={() => { remove(confirmDelete.id); setConfirmDelete(null); }}
+          onClose={() => setConfirmDelete(null)}
+        />
+      )}
     </Stack>
   );
 }

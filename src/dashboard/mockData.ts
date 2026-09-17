@@ -411,6 +411,78 @@ function buildQuestions(a: AssessmentReviewData, seed: number): ReviewQuestion[]
   });
 }
 
+// the written solution of a question, keyed by its prompt — what ALFI would walk a student
+// through, and what a teacher previewing a test wants to see next to the question
+const SOLUTIONS = new Map(
+  Object.values(QUESTION_BANK).flat().map((q) => [q.prompt, q.right]),
+);
+/* ---------- graphs ---------- */
+
+// A few questions are about a curve, and Uri wants that curve shown on the card. Nothing in
+// the bank holds an image, so the shape is sampled from the function itself. Test data for now:
+// one entry per question we have drawn by hand.
+export type QuestionGraph = { curves: { fn: (x: number) => number; color?: 'info' | 'text' }[]; from: number; to: number };
+
+// the questions whose picture we drew by hand, because the picture IS the question
+const GRAPHS: { match: string; graph: QuestionGraph }[] = [
+  {
+    // the question hands the student a curve and asks to read it — so the curve is the question
+    match: 'לפניכם גרף של פונקציה f(x)',
+    graph: { curves: [{ fn: (x) => x ** 3 - 6 * x ** 2 + 9 * x + 2 }], from: -0.6, to: 4.4 },
+  },
+  {
+    // two lines and where they meet: the picture says in one look what the question asks for
+    match: 'נקודת החיתוך של הישרים',
+    graph: {
+      curves: [
+        { fn: (x) => 3 * x - 1 },
+        { fn: (x) => -x + 7, color: 'text' },
+      ],
+      from: -1,
+      to: 5,
+    },
+  },
+];
+
+// Test data until the bank carries real figures: a rotating set of shapes handed out across the
+// library, so a teacher scanning it sees what a bank with pictures in it will look like.
+const SHAPES: QuestionGraph[] = [
+  { curves: [{ fn: (x) => x ** 2 - 3 }], from: -3, to: 3 },
+  { curves: [{ fn: (x) => Math.sin(x) }], from: -Math.PI, to: Math.PI },
+  { curves: [{ fn: (x) => -(x ** 3) + 3 * x }], from: -2.2, to: 2.2 },
+  { curves: [{ fn: (x) => Math.sqrt(9 - x * x) }], from: -2.9, to: 2.9 },
+  { curves: [{ fn: (x) => Math.pow(2, x) }], from: -2, to: 3 },
+  {
+    curves: [
+      { fn: (x) => x / 2 + 1 },
+      { fn: (x) => -x + 4, color: 'text' },
+    ],
+    from: -2,
+    to: 5,
+  },
+  { curves: [{ fn: (x) => Math.log(x) }], from: 0.3, to: 6 },
+];
+
+// every seventh question in the bank gets one. Built on first use, because the bank itself is
+// assembled further down this file.
+let graphByPrompt: Map<string, QuestionGraph> | null = null;
+const handedOut = () => {
+  if (!graphByPrompt) {
+    graphByPrompt = new Map();
+    QUESTION_LIBRARY.forEach((q, i) => {
+      if (i % 7 === 6) graphByPrompt!.set(q.prompt, SHAPES[Math.floor(i / 7) % SHAPES.length]);
+    });
+  }
+  return graphByPrompt;
+};
+
+/** the picture a question is about, when we have one for it */
+export const graphFor = (prompt: string): QuestionGraph | null =>
+  GRAPHS.find((g) => prompt.includes(g.match))?.graph ?? handedOut().get(prompt) ?? null;
+
+export const solutionFor = (prompt: string): string | null =>
+  SOLUTIONS.get(prompt) ?? QUESTION_LIBRARY.find((q) => q.prompt === prompt)?.solution ?? null;
+
 export const ASSESSMENT_QUESTIONS: ReviewQuestion[][] =
   ASSESSMENT_REVIEWS.map((a, i) => buildQuestions(a, i * 15485863 + 101));
 
@@ -452,9 +524,21 @@ export type ClassAssessment = {
   reviewIndex: number;
   submitted: number;
   avgScore: number | null;
+  // when the task opens and closes on its date. Nothing has set these yet — the form leaves
+  // them empty rather than inventing an hour the school never chose.
+  opensAt?: string;
+  closesAt?: string;
+  // a task built in בניית מבחן brings its own questions; the seeded ones borrow a bank by
+  // reviewIndex, which is what the editor falls back to
+  questions?: string[];
+  // the תת נושאים it is filed under. Set in the editor; otherwise read off its questions.
+  sections?: string[];
+  // a test taken whole out of the ready-made shelf: its questions are a closed unit, so the
+  // editor shows them but lets nothing be added or removed
+  readyMade?: boolean;
 };
 
-export const UNITS = ['5 יח"ל', '4 יח"ל'];
+export const UNITS = ['5 יח"ל', '4 יח"ל', '3 יח"ל'];
 export const ASSESSMENT_TAGS = ['שיעורי בית', 'הכנה למבחן', 'חזרה', 'העשרה', 'תרגול כיתה'];
 
 // title / unit / topic / subTopic / tags for each column of the מצב תלמידים table, in the
@@ -479,21 +563,46 @@ const SCHEDULED: ClassAssessment[] = [
   {
     id: 's1', title: 'חקירת פונקציה רציונלית', kind: 'תרגול',
     unit: '5 יח"ל', topic: 'אנליזה', subTopic: 'חקירת פונקציה', tags: ['שיעורי בית'],
-    opensOn: '30/08/26', state: 'scheduled', reviewIndex: 4, submitted: 0, avgScore: null,
+    opensOn: '30/08/26', opensAt: '08:30', closesAt: '09:30',
+    state: 'scheduled', reviewIndex: 4, submitted: 0, avgScore: null,
   },
   {
     id: 's2', title: 'בוחן סיכום - אנליזה', kind: 'בוחן',
     unit: '5 יח"ל', topic: 'אנליזה', subTopic: 'פולינום ונגזרות', tags: ['הכנה למבחן'],
-    opensOn: '02/09/26', state: 'scheduled', reviewIndex: 0, submitted: 0, avgScore: null,
+    opensOn: '02/09/26', opensAt: '10:00', closesAt: '11:00',
+    state: 'scheduled', reviewIndex: 0, submitted: 0, avgScore: null,
+    // taken as-is from בחירה מהערכות קיימות, so its questions cannot be touched
+    readyMade: true,
   },
   {
     id: 's3', title: 'חזרה לקראת מתכונת', kind: 'תרגול',
     unit: '5 יח"ל', topic: 'חזרה כללית', subTopic: 'מעורב', tags: ['חזרה', 'הכנה למבחן'],
-    opensOn: '06/09/26', state: 'scheduled', reviewIndex: 3, submitted: 0, avgScore: null,
+    opensOn: '06/09/26', opensAt: '13:15', closesAt: '14:15',
+    state: 'scheduled', reviewIndex: 3, submitted: 0, avgScore: null,
+  },
+];
+
+// Opened this morning, so most of the class has not got to it yet — the low end of the
+// completion scale, which nothing else in the demo reaches.
+const OPEN_NOW: ClassAssessment[] = [
+  {
+    id: 'o1', title: 'תרגול אסימפטוטות', kind: 'תרגול',
+    unit: '5 יח"ל', topic: 'אנליזה', subTopic: 'חקירת פונקציה', tags: ['שיעורי בית'],
+    opensOn: '26/08/26', opensAt: '08:30', closesAt: '09:30',
+    state: 'open', reviewIndex: 4, submitted: 6, avgScore: 64,
   },
 ];
 
 const yearly = (ddmm: string) => `${ddmm}/26`;
+
+// School hours, rotating by lesson slot so every task says when it opened and when it shut.
+const LESSON_HOURS = ['08:30', '10:00', '11:30', '13:15'];
+const lessonHour = (i: number) => LESSON_HOURS[i % LESSON_HOURS.length];
+const hourPlus = (hhmm: string, minutes: number) => {
+  const [h, m] = hhmm.split(':').map(Number);
+  const total = h * 60 + m + minutes;
+  return `${String(Math.floor(total / 60) % 24).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+};
 
 const PAST: ClassAssessment[] = STATUS_ASSESSMENTS.map((a, i) => {
   const meta = ASSESSMENT_META[i];
@@ -512,6 +621,8 @@ const PAST: ClassAssessment[] = STATUS_ASSESSMENTS.map((a, i) => {
     subTopic: meta.subTopic,
     tags: meta.tags,
     opensOn: yearly(a.date),
+    opensAt: lessonHour(i),
+    closesAt: hourPlus(lessonHour(i), 60),
     // the newest two are still taking submissions; everything older has closed
     state: i >= STATUS_ASSESSMENTS.length - 2 ? 'open' : 'ended',
     reviewIndex: recent >= 0 ? recent : i % RECENT_PRACTICES.length,
@@ -523,11 +634,33 @@ const PAST: ClassAssessment[] = STATUS_ASSESSMENTS.map((a, i) => {
 });
 
 // newest first, and anything still queued sits above everything that has already opened
-export const CLASS_ASSESSMENTS: ClassAssessment[] = [...SCHEDULED].reverse().concat([...PAST].reverse());
+export const CLASS_ASSESSMENTS: ClassAssessment[] = [...SCHEDULED].reverse().concat(OPEN_NOW, [...PAST].reverse());
 
 /* ---------- the question library: the pool a task is built from ---------- */
 
-export const QUESTION_TAGS = ['בגרות', 'חובה', 'העשרה', 'הוכחה', 'שאלה קצרה'];
+export const QUESTION_TAGS = ['בגרות', 'חובה', 'העשרה', 'הוכחה', 'שאלה קצרה', 'שאלה ארוכה'];
+
+// Third level of the curriculum, under a תת נושא of the bank: what the teacher picks last
+// when narrowing down in בניית מבחן.
+const SECTIONS: Record<string, string[]> = {
+  'חקירת פונקציה': ['חקירה מלאה', 'נקודות קיצון', 'אסימפטוטות'],
+  'פולינום ונגזרות': ['נגזרת ומשוואת המשיק', 'הקשר בין גרף הפונקציה לגרף הנגזרת', 'חזרה'],
+  'משוואות ריבועיות': ['פתרון אלגברי', 'נוסחת השורשים'],
+  'משוואות ואי-שוויונות': ['אי-שוויון ריבועי', 'מערכת משוואות'],
+  'פרבולה': ['נקודות חיתוך', 'קודקוד וסימטריה'],
+  'סדרה חשבונית': ['איבר כללי', 'סכום סדרה'],
+  'סדרה הנדסית': ['איבר כללי', 'סכום סדרה'],
+  'סכום סדרה': ['סכום חלקי', 'סדרה אינסופית'],
+  'מרחק בין נקודות': ['אמצע קטע', 'אורך קטע'],
+  'משוואת הישר': ['שיפוע', 'מקבילים ומאונכים'],
+  'מעגל': ['משוואת המעגל', 'מצב הדדי עם ישר'],
+  'משולשים': ['חפיפה', 'זוויות'],
+  'מרובעים ומעגל': ['מקבילית', 'זוויות במעגל'],
+  'משולש ישר זווית': ['פיתגורס', 'יחסים טריגונומטריים'],
+  'בעיות תנועה': ['מהירות קבועה', 'שינוי מהירות'],
+  'מעורב': ['חזרה כללית'],
+};
+const sectionsFor = (subTopic: string) => SECTIONS[subTopic] ?? ['כללי'];
 
 export type LibraryQuestion = {
   id: string;
@@ -539,11 +672,19 @@ export type LibraryQuestion = {
   tags: string[];
   // which assessments this question already went out in — empty means never used
   usedIn: string[];
+  // where it sits under its תת נושא — the last step of the cascade in בניית מבחן
+  section: string;
+  // the worked answer. Questions that already ran carry theirs in QUESTION_BANK; the ones
+  // written straight into the bank carry it here, so every question in the library has one.
+  solution?: string;
 };
+
+// the seed rows do not carry a section; it is attached when the bank is assembled
+type LibrarySeed = Omit<LibraryQuestion, 'section'>;
 
 // Everything the class has already been asked, carried over from the assessments it ran in,
 // so "used before" is a fact rather than a flag someone has to maintain.
-const USED: LibraryQuestion[] = RECENT_PRACTICES.flatMap((p, pi) => {
+const USED: LibrarySeed[] = RECENT_PRACTICES.flatMap((p, pi) => {
   const metaIndex = STATUS_ASSESSMENTS.findIndex((a) => `${a.date}/26` === p.sentOn);
   const meta = ASSESSMENT_META[metaIndex];
   return ASSESSMENT_QUESTIONS[pi].map((q, qi) => ({
@@ -559,47 +700,164 @@ const USED: LibraryQuestion[] = RECENT_PRACTICES.flatMap((p, pi) => {
 });
 
 // Written and never sent — what a teacher browses for when she wants something new.
-const FRESH: LibraryQuestion[] = [
+const FRESH: LibrarySeed[] = [
+  // a full bagrut-style question: long enough that a card has to clip it
+  {
+    id: 'n0',
+    prompt: 'נתונה הפונקציה f(x) = (x² − 4) / (x − 1).\n'
+      + 'א. מצא את תחום ההגדרה של הפונקציה.\n'
+      + 'ב. מצא את נקודות החיתוך של הגרף עם הצירים.\n'
+      + 'ג. מצא את האסימפטוטה האנכית ואת האסימפטוטה המשופעת.\n'
+      + 'ד. מצא את נקודות הקיצון של הפונקציה וקבע את סוגן.\n'
+      + 'ה. קבע את תחומי העלייה והירידה.\n'
+      + 'ו. שרטט סקיצה של גרף הפונקציה לפי הסעיפים הקודמים.\n'
+      + 'ז. כמה פתרונות יש למשוואה f(x) = k עבור k = 0? נמק.',
+    difficulty: 'קשה', unit: '5 יח"ל', topic: 'אנליזה', subTopic: 'חקירת פונקציה',
+    tags: ['בגרות', 'שאלה ארוכה'], usedIn: [],
+    solution: 'א. המכנה מתאפס ב-x = 1, ולכן תחום ההגדרה הוא x ≠ 1\nב. עם ציר ה-x: x² − 4 = 0 ⟵ x = 2, x = −2, כלומר (2, 0) ו-(−2, 0)\nעם ציר ה-y: f(0) = (−4)/(−1) = 4, כלומר (0, 4)\nג. אסימפטוטה אנכית: x = 1 (שם המכנה מתאפס והמונה לא)\nחילוק: x² − 4 = (x − 1)(x + 1) − 3, ולכן f(x) = x + 1 − 3/(x − 1)\nהאסימפטוטה המשופעת היא y = x + 1\nד. f′(x) = (x² − 2x + 4)/(x − 1)² = 1 + 3/(x − 1)²\nהמונה x² − 2x + 4 = (x − 1)² + 3 חיובי תמיד, ולכן אין נקודות קיצון\nה. הנגזרת חיובית בכל תחום ההגדרה: הפונקציה עולה בכל אחד מהענפים,\nב-(−∞, 1) וב-(1, ∞), ואין תחומי ירידה\nו. שני ענפים עולים משני צדי x = 1, שניהם מתקרבים לישר y = x + 1\nז. f(x) = 0 כאשר x² − 4 = 0, כלומר x = 2 ו-x = −2 — שני פתרונות',
+  },
   {
     id: 'n1', prompt: 'נתונה הפונקציה f(x) = x⁴ − 8x² + 7.\nא. מצא את נקודות הקיצון.\nב. קבע את סוג כל נקודת קיצון.',
     difficulty: 'קשה', unit: '5 יח"ל', topic: 'אנליזה', subTopic: 'פולינום ונגזרות', tags: ['בגרות'], usedIn: [],
+    solution: 'f′(x) = 4x³ − 16x = 4x(x² − 4)\nנשווה לאפס: x = 0, x = 2, x = −2\nf(0) = 7, f(2) = 16 − 32 + 7 = −9, f(−2) = −9\nf″(x) = 12x² − 16\nf″(0) = −16 < 0 ⟵ (0, 7) מקסימום\nf″(±2) = 32 > 0 ⟵ (2, −9) ו-(−2, −9) מינימום',
   },
   {
     id: 'n2', prompt: 'גזור את הפונקציה f(x) = (2x + 1)(x − 3).',
     difficulty: 'קל', unit: '5 יח"ל', topic: 'אנליזה', subTopic: 'פולינום ונגזרות', tags: ['שאלה קצרה', 'חובה'], usedIn: [],
+    solution: 'נפתח סוגריים: f(x) = 2x² − 5x − 3\nנגזור איבר איבר: f′(x) = 4x − 5\nבדיקה בכלל המכפלה: 2(x − 3) + (2x + 1) = 4x − 5',
   },
   {
     id: 'n3', prompt: 'נתונות הנקודות A(−2, 1), B(4, 9).\nמצא את אורך הקטע AB ואת אמצעו.',
     difficulty: 'קל', unit: '5 יח"ל', topic: 'גאומטריה אנליטית', subTopic: 'מרחק בין נקודות', tags: ['חובה'], usedIn: [],
+    solution: 'הפרש ה-x: 4 − (−2) = 6, הפרש ה-y: 9 − 1 = 8\nAB = √(6² + 8²) = √100 = 10\nאמצע הקטע: ((−2 + 4)/2, (1 + 9)/2) = (1, 5)',
   },
   {
     id: 'n4', prompt: 'מצא את משוואת המעגל שמרכזו (2, −1) ורדיוסו 5.\nבדוק אם הנקודה (5, 3) נמצאת עליו.',
     difficulty: 'בינוני', unit: '5 יח"ל', topic: 'גאומטריה אנליטית', subTopic: 'מעגל', tags: ['בגרות'], usedIn: [],
+    solution: 'משוואת מעגל שמרכזו (a, b) ורדיוסו r היא (x − a)² + (y − b)² = r²\nלכן: (x − 2)² + (y + 1)² = 25\nנציב את (5, 3): (5 − 2)² + (3 + 1)² = 9 + 16 = 25\nהשוויון מתקיים, ולכן הנקודה נמצאת על המעגל',
+  },
+  {
+    id: 'n4b',
+    prompt: 'רכבת יצאה מתחנה א\' לתחנה ב\' במהירות קבועה.\n'
+      + 'המרחק בין התחנות הוא 240 ק"מ.\n'
+      + 'שעה לאחר יציאתה עצרה הרכבת ל-45 דקות, ולאחר מכן המשיכה במהירות הגדולה ב-20 קמ"ש מהמהירות המקורית.\n'
+      + 'הרכבת הגיעה לתחנה ב\' בדיוק בזמן שנקבע בלוח הזמנים.\n'
+      + 'א. סמן את המהירות המקורית ב-x ובטא באמצעותה את זמן הנסיעה המתוכנן.\n'
+      + 'ב. בטא את זמן הנסיעה בפועל, כולל העצירה.\n'
+      + 'ג. מצא את המהירות המקורית של הרכבת.\n'
+      + 'ד. כמה זמן ארכה הנסיעה בפועל?',
+    difficulty: 'קשה', unit: '5 יח"ל', topic: 'אלגברה', subTopic: 'בעיות תנועה',
+    tags: ['בגרות', 'שאלה ארוכה'], usedIn: [],
+    solution: 'א. נסמן ב-x את המהירות המקורית. זמן הנסיעה המתוכנן הוא 240/x שעות\nב. בשעה הראשונה עברה הרכבת x ק"מ, לאחריה עצרה 45 דקות = 3/4 שעה,\nואת שארית הדרך, 240 − x ק"מ, עברה במהירות x + 20\nזמן הנסיעה בפועל: 1 + 3/4 + (240 − x)/(x + 20)\nג. הרכבת הגיעה בזמן, ולכן: 1 + 3/4 + (240 − x)/(x + 20) = 240/x\nנכפול ב-4x(x + 20): 7x(x + 20) + 4x(240 − x) = 960(x + 20)\n7x² + 140x + 960x − 4x² = 960x + 19200\n3x² + 140x − 19200 = 0\nלפי נוסחת השורשים: x = (−140 + 500)/6 = 60\nהמהירות המקורית היא 60 קמ"ש\nד. 1 + 3/4 + 180/80 = 1 + 0.75 + 2.25 = 4 שעות, כמו הזמן המתוכנן 240/60',
   },
   {
     id: 'n5', prompt: 'הוכח שסכום הזוויות במשולש שווה ל-180°.',
     difficulty: 'בינוני', unit: '4 יח"ל', topic: 'גאומטריה', subTopic: 'משולשים', tags: ['הוכחה'], usedIn: [],
+    solution: 'נעביר דרך הקודקוד A ישר המקביל לצלע BC\nהזווית שבין הישר לצלע AB שווה ל-∠B (זוויות מתחלפות)\nהזווית שבין הישר לצלע AC שווה ל-∠C (זוויות מתחלפות)\nשלוש הזוויות שליד הקודקוד A משלימות לישר, כלומר ל-180°\nלכן ∠A + ∠B + ∠C = 180°',
   },
   {
     id: 'n6', prompt: 'במקבילית ABCD נתון ∠A = 70°.\nחשב את שאר הזוויות ונמק.',
     difficulty: 'קל', unit: '4 יח"ל', topic: 'גאומטריה', subTopic: 'מרובעים ומעגל', tags: ['שאלה קצרה'], usedIn: [],
+    solution: 'במקבילית זוויות נגדיות שוות: ∠C = ∠A = 70°\nזוויות סמוכות במקבילית משלימות ל-180° (זוויות חד-צדדיות בין מקבילים)\n∠B = 180° − 70° = 110°, וכן ∠D = 110°\nבדיקה: 70 + 110 + 70 + 110 = 360°',
   },
   {
     id: 'n7', prompt: 'סדרה חשבונית: a₁ = 4 והפרשה 3.\nמצא את האיבר ה-20 ואת סכום 20 האיברים הראשונים.',
     difficulty: 'בינוני', unit: '5 יח"ל', topic: 'סדרות', subTopic: 'סדרה חשבונית', tags: ['חובה'], usedIn: [],
+    solution: 'האיבר הכללי: aₙ = a₁ + (n − 1)d\na₂₀ = 4 + 19·3 = 61\nסכום סדרה חשבונית: Sₙ = n(a₁ + aₙ)/2\nS₂₀ = 20(4 + 61)/2 = 650',
   },
   {
     id: 'n8', prompt: 'בסדרה הנדסית a₁ = 3 ומנתה 2.\nמצא את סכום 8 האיברים הראשונים.',
     difficulty: 'בינוני', unit: '5 יח"ל', topic: 'סדרות', subTopic: 'סדרה הנדסית', tags: ['בגרות'], usedIn: [],
+    solution: 'סכום סדרה הנדסית: Sₙ = a₁(qⁿ − 1)/(q − 1)\nS₈ = 3(2⁸ − 1)/(2 − 1)\n2⁸ = 256, ולכן S₈ = 3·255 = 765',
   },
   {
     id: 'n9', prompt: 'במשולש ישר זווית הניצבים הם 6 ו-8.\nחשב את היתר ואת הזווית שמול הניצב הקטן.',
     difficulty: 'קל', unit: '4 יח"ל', topic: 'טריגונומטריה', subTopic: 'משולש ישר זווית', tags: ['חובה', 'שאלה קצרה'], usedIn: [],
+    solution: 'לפי משפט פיתגורס: היתר² = 6² + 8² = 100\nהיתר = 10\nהזווית שמול הניצב הקטן: tan α = 6/8 = 0.75\nα = 36.87° ≈ 36.9°',
   },
   {
     id: 'n10', prompt: 'הוכח כי בכל מעגל, זווית היקפית שווה למחצית הזווית המרכזית הנשענת על אותה קשת.',
     difficulty: 'קשה', unit: '5 יח"ל', topic: 'גאומטריה', subTopic: 'מרובעים ומעגל', tags: ['הוכחה', 'העשרה'], usedIn: [],
+    solution: 'נסמן את הזווית ההיקפית ∠BAC = α, ונעביר את הרדיוס OA\nהמשולש OAB שווה שוקיים (OA = OB רדיוסים), ולכן זוויות הבסיס שוות\nהזווית המרכזית ∠BOC היא זווית חיצונית למשולש OAB\nזווית חיצונית שווה לסכום שתי הזוויות הפנימיות שאינן צמודות לה\nלכן ∠BOC = α + α = 2α\nכלומר הזווית ההיקפית שווה למחצית הזווית המרכזית הנשענת על אותה קשת',
   },
 ];
 
-export const QUESTION_LIBRARY: LibraryQuestion[] = [...FRESH, ...USED];
+// each question lands on one of its תת נושא's sections, spread evenly so no list comes back empty
+export const QUESTION_LIBRARY: LibraryQuestion[] = [...FRESH, ...USED].map((q, i) => {
+  const options = sectionsFor(q.subTopic);
+  return { ...q, section: options[i % options.length] };
+});
+
+/* ---------- assessments a teacher can take as they are, for בניית מבחן ---------- */
+
+// no kind on it: everything offered in בניית מבחן is a test. A תרגול is built in בניית תרגול.
+export type ReadyTest = {
+  id: string;
+  title: string;
+  unit: string;
+  topic: string;
+  subTopic: string;
+  tags: string[];
+  // the questions it already holds, in order
+  questions: string[];
+  // read off those questions where the bank knows them, so the same filters can reach a
+  // whole test: which תת נושאים it covers and which difficulties it mixes
+  sections: string[];
+  difficulties: Difficulty[];
+};
+
+const BANK_BY_PROMPT = new Map(QUESTION_LIBRARY.map((q) => [q.prompt, q]));
+
+/** what the bank knows about one question of a ready test — null for a one-off question */
+export const bankQuestionFor = (prompt: string) => BANK_BY_PROMPT.get(prompt) ?? null;
+
+/** the תת נושאים an assessment covers, read off the questions it carries */
+export const sectionsOfAssessment = (a: ClassAssessment) => {
+  if (a.sections?.length) return a.sections;
+  const prompts = a.questions ?? ASSESSMENT_QUESTIONS[a.reviewIndex].map((q) => q.prompt);
+  return Array.from(new Set(prompts.map((p) => BANK_BY_PROMPT.get(p)?.section).filter(Boolean) as string[]));
+};
+
+/** every assessment the class already has, offered whole — the "use it as is" route */
+export const READY_TESTS: ReadyTest[] = CLASS_ASSESSMENTS.map((a) => {
+  const questions = ASSESSMENT_QUESTIONS[a.reviewIndex].map((q) => q.prompt);
+  const known = questions.map((q) => BANK_BY_PROMPT.get(q)).filter(Boolean) as LibraryQuestion[];
+  return {
+    id: a.id,
+    title: a.title,
+    unit: a.unit,
+    topic: a.topic,
+    subTopic: a.subTopic,
+    tags: a.tags,
+    questions,
+    sections: Array.from(new Set(known.map((q) => q.section))),
+    difficulties: Array.from(new Set(known.map((q) => q.difficulty))),
+  };
+});
+
+/* ---------- the curriculum, as the בניית מבחן filters walk it ---------- */
+
+const uniqHe = (arr: string[]) => Array.from(new Set(arr)).sort((a, b) => a.localeCompare(b, 'he'));
+
+/** נושא → יחידה → תת נושא, read off the bank itself so a filter can never offer an empty list */
+export const CURRICULUM_TOPICS = uniqHe(QUESTION_LIBRARY.map((q) => q.topic));
+export const unitsOf = (topic: string) =>
+  uniqHe(QUESTION_LIBRARY.filter((q) => !topic || q.topic === topic).map((q) => q.subTopic));
+export const sectionsOf = (topic: string, unit: string) =>
+  uniqHe(QUESTION_LIBRARY
+    .filter((q) => (!topic || q.topic === topic) && (!unit || q.subTopic === unit))
+    .map((q) => q.section));
+
+// Every נושא / תת נושא already in play, for the form's dropdowns. A teacher can still type
+// a new one — these are what the class has covered so far, not a closed list.
+const allCurriculum = [
+  ...CLASS_ASSESSMENTS.map((a) => ({ topic: a.topic, subTopic: a.subTopic })),
+  ...QUESTION_LIBRARY.map((q) => ({ topic: q.topic, subTopic: q.subTopic })),
+];
+const uniqSorted = (arr: string[]) => Array.from(new Set(arr)).sort((a, b) => a.localeCompare(b, 'he'));
+
+export const TOPICS = uniqSorted(allCurriculum.map((c) => c.topic));
+export const SUB_TOPICS = uniqSorted(allCurriculum.map((c) => c.subTopic));
+/** the sub topics seen under one topic — so picking a נושא narrows what comes next */
+export const subTopicsOf = (topic: string) =>
+  uniqSorted(allCurriculum.filter((c) => c.topic === topic).map((c) => c.subTopic));

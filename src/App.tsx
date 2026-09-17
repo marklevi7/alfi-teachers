@@ -6,6 +6,7 @@ import { StudentsStatus, type StudentsVariant } from './dashboard/StudentsStatus
 import { AssessmentReview, type ReviewVariant } from './dashboard/AssessmentReview';
 import { AllAssessments, type AllAssessmentsVariant } from './dashboard/AllAssessments';
 import { ScheduledTask } from './dashboard/ScheduledTask';
+import { BuildTest } from './dashboard/BuildTest';
 import { CLASS_ASSESSMENTS, type ClassAssessment } from './dashboard/mockData';
 import { BlankScreen } from './dashboard/BlankScreen';
 import { ControlBar, type Device, type ScreenVariant } from './dashboard/ControlBar';
@@ -38,7 +39,7 @@ export function App() {
   // which row of תרגולים אחרונים opened סקירת הערכה, and where the back button returns to
   const [assessment, setAssessment] = useState(0);
   const [reviewFrom, setReviewFrom] = useState<'main' | 'results'>('main');
-  // כל ההערכות owns real state — a delete or a duplicate has to survive leaving the screen
+  // כל ההערכות owns real state — a delete has to survive leaving the screen
   const [assessments, setAssessments] = useState<ClassAssessment[]>(CLASS_ASSESSMENTS);
   const [scheduledId, setScheduledId] = useState<string | null>(null);
   const scheduled = assessments.find((a) => a.id === scheduledId) ?? null;
@@ -123,12 +124,20 @@ export function App() {
                   setScreen('results');
                 }}
               />
+            ) : screen === 'build-test' ? (
+              <BuildTest
+                // a sent test joins כל ההערכות as a scheduled one, and the screen follows it there
+                onSend={(next) => {
+                  setAssessments([next, ...assessments]);
+                  setScreen('results');
+                }}
+              />
             ) : screen === 'results' ? (
               <AllAssessments
                 variant={variant as AllAssessmentsVariant}
                 items={assessments}
                 onItemsChange={setAssessments}
-                onOpenScheduled={(id) => { setScheduledId(id); setScreen('scheduled-task'); }}
+                onEditTask={(id) => { setScheduledId(id); setScreen('scheduled-task'); }}
                 onOpenReview={(i) => {
                   setAssessment(i);
                   setReviewFrom('results');

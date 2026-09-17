@@ -47,7 +47,7 @@ export function Shell({ active, onNavigate, children }: { active: Screen; onNavi
     // The window never scrolls: the content column is the single scroller, and an RTL
     // element puts its scrollbar on the inline end — the physical LEFT edge, which is
     // where Mark wants it on every screen.
-    <Box sx={{ display: 'flex', height: '100%', overflow: 'hidden', bgcolor: (t) => alpha(t.palette.primary.main, 0.03) }}>
+    <Box sx={{ display: 'flex', height: '100%', overflow: 'hidden', bgcolor: 'grey.50' }}>
       {/* full height beside the scroller, and never a scrollbar of its own */}
       <Box
         component="nav"

@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react';
-import { alpha } from '@mui/material/styles';
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
@@ -7,7 +6,6 @@ import Button from '@mui/material/Button';
 import IconButton from '@mui/material/IconButton';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
-import CardActionArea from '@mui/material/CardActionArea';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
@@ -23,18 +21,14 @@ import useMediaQuery from '@mui/material/useMediaQuery';
 import { useTheme } from '@mui/material/styles';
 import SearchRounded from '@mui/icons-material/SearchRounded';
 import CloseRounded from '@mui/icons-material/CloseRounded';
-import CheckCircleRounded from '@mui/icons-material/CheckCircleRounded';
-import HistoryRounded from '@mui/icons-material/HistoryRounded';
 import HelpOutlineRounded from '@mui/icons-material/HelpOutlineRounded';
 import { FREDOKA } from '../theme';
-import { Pill, PILL_TEXT, DifficultyPill } from './Pills';
 import { EmptyState } from './EmptyState';
+import { QuestionPickCard } from './QuestionPickCard';
+import { QuestionPreviewDialog } from './QuestionPreviewDialog';
 import {
-  QUESTION_LIBRARY, QUESTION_TAGS, UNITS, type LibraryQuestion, type Difficulty,
+  QUESTION_LIBRARY, type LibraryQuestion, type Difficulty,
 } from './mockData';
-
-// One shared style for the small meta text in a card, same as the student app's META.
-const META = { fontSize: (t: import('@mui/material/styles').Theme) => t.typography.body2.fontSize, fontWeight: 400, color: 'text.secondary' } as const;
 
 type UsedFilter = 'all' | 'fresh' | 'used';
 const USED_FILTERS: { key: UsedFilter; label: string }[] = [
@@ -45,65 +39,6 @@ const USED_FILTERS: { key: UsedFilter; label: string }[] = [
 const DIFFICULTIES: Difficulty[] = ['קל', 'בינוני', 'קשה'];
 
 const uniq = (arr: string[]) => Array.from(new Set(arr));
-
-/* ---------- one question in the library ---------- */
-
-function LibraryCard({ q, selected, disabled, onSelect }: {
-  q: LibraryQuestion; selected: boolean; disabled: boolean; onSelect: () => void;
-}) {
-  return (
-    <Card
-      variant="outlined"
-      sx={{
-        borderRadius: 3,
-        borderColor: selected ? 'primary.main' : 'divider',
-        bgcolor: (t) => selected ? alpha(t.palette.primary.main, 0.06) : 'background.paper',
-        opacity: disabled ? 0.6 : 1,
-        transition: (t) => t.transitions.create(['box-shadow', 'border-color', 'background-color']),
-        ...(selected && { boxShadow: 4 }),
-        '&:hover': disabled ? {} : { boxShadow: 4, borderColor: 'primary.main' },
-        '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
-      }}
-    >
-      <CardActionArea onClick={onSelect} disabled={disabled} sx={{ px: 3, py: 2.5 }}>
-        <Stack direction="row" spacing={2} alignItems="flex-start">
-          {/* the tick is the whole selection state — no checkbox competing with it */}
-          <Box sx={{ width: 28, flexShrink: 0, pt: 0.25 }}>
-            {selected && <CheckCircleRounded sx={{ color: 'primary.main' }} />}
-          </Box>
-
-          <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Typography
-              component="div"
-              sx={{ whiteSpace: 'pre-line', textAlign: 'start', lineHeight: (t) => t.typography.button.lineHeight }}
-            >
-              {q.prompt}
-            </Typography>
-
-            <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" useFlexGap sx={{ mt: 1.5 }}>
-              <DifficultyPill level={q.difficulty} />
-              {/* a question that already went out says so, and says where */}
-              {q.usedIn.length > 0 && (
-                <Pill>
-                  <HistoryRounded sx={{ fontSize: 16, color: 'text.secondary' }} />
-                  <Typography component="span" sx={{ ...PILL_TEXT, color: 'text.secondary' }}>
-                    כבר בשימוש · {q.usedIn.join(', ')}
-                  </Typography>
-                </Pill>
-              )}
-              {disabled && (
-                <Typography sx={{ ...META, fontWeight: 700, color: 'primary.dark' }}>כבר במשימה</Typography>
-              )}
-              <Box sx={{ flexGrow: 1 }} />
-              <Typography sx={META}>{q.unit} · {q.topic} · {q.subTopic}</Typography>
-              {q.tags.length > 0 && <Typography sx={META}>{q.tags.map((t) => `#${t}`).join('  ')}</Typography>}
-            </Stack>
-          </Box>
-        </Stack>
-      </CardActionArea>
-    </Card>
-  );
-}
 
 /* ---------- the library ---------- */
 
@@ -122,29 +57,54 @@ export function QuestionLibrary({ inUse = [], onPick, onClose }: {
   const phone = useMediaQuery(theme.breakpoints.down('md'));
   const [q, setQ] = useState('');
   const [used, setUsed] = useState<UsedFilter>('all');
-  const [unit, setUnit] = useState('');
+  // נושא → יחידה → תת נושא → תגיות: each list is what is left after the one before it
   const [topic, setTopic] = useState('');
-  const [subTopic, setSubTopic] = useState('');
+  const [unit, setUnit] = useState('');
+  const [sections, setSections] = useState<string[]>([]);
   const [difficulty, setDifficulty] = useState('');
   const [tags, setTags] = useState<string[]>([]);
   const [picked, setPicked] = useState<LibraryQuestion | null>(null);
+  // a question opened to be read in full, with its answer
+  const [reading, setReading] = useState<LibraryQuestion | null>(null);
 
   const TOPICS = useMemo(() => uniq(QUESTION_LIBRARY.map((x) => x.topic)), []);
-  const SUBTOPICS = useMemo(() => uniq(QUESTION_LIBRARY.map((x) => x.subTopic)), []);
+  const UNITS_OF = useMemo(
+    () => uniq(QUESTION_LIBRARY.filter((x) => !topic || x.topic === topic).map((x) => x.subTopic)),
+    [topic],
+  );
+  const SECTIONS_OF = useMemo(
+    () => uniq(QUESTION_LIBRARY
+      .filter((x) => (!topic || x.topic === topic) && (!unit || x.subTopic === unit))
+      .map((x) => x.section)),
+    [topic, unit],
+  );
+  // only tags that still exist further down the cascade are worth offering
+  const TAGS_OF = useMemo(
+    () => uniq(QUESTION_LIBRARY
+      .filter((x) => (!topic || x.topic === topic) && (!unit || x.subTopic === unit)
+        && (sections.length === 0 || sections.includes(x.section)))
+      .flatMap((x) => x.tags)),
+    [topic, unit, sections],
+  );
 
   const shown = useMemo(
     () => QUESTION_LIBRARY.filter((x) =>
       (!q || x.prompt.includes(q.trim())) &&
       (used === 'all' || (used === 'used' ? x.usedIn.length > 0 : x.usedIn.length === 0)) &&
-      (!unit || x.unit === unit) &&
       (!topic || x.topic === topic) &&
-      (!subTopic || x.subTopic === subTopic) &&
+      (!unit || x.subTopic === unit) &&
+      (sections.length === 0 || sections.includes(x.section)) &&
       (!difficulty || x.difficulty === difficulty) &&
       // several tags can be on at once; a question matches if it carries any of them
       (tags.length === 0 || x.tags.some((t) => tags.includes(t)))
     ),
-    [q, used, unit, topic, subTopic, difficulty, tags],
+    [q, used, topic, unit, sections, difficulty, tags],
   );
+
+  // a step back up the cascade drops what was chosen below it
+  const pickTopic = (next: string) => { setTopic(next); setUnit(''); setSections([]); setTags([]); };
+  const pickUnit = (next: string) => { setUnit(next); setSections([]); setTags([]); };
+  const pickSections = (next: string[]) => { setSections(next); setTags([]); };
 
   return (
     <Dialog
@@ -173,6 +133,7 @@ export function QuestionLibrary({ inUse = [], onPick, onClose }: {
             bottom-aligned row that wraps when it runs out of width. */}
         <Card variant="outlined" sx={{ borderRadius: 2, mb: 3 }}>
           <CardContent>
+            <Stack spacing={2}>
             <Stack direction="row" spacing={2} alignItems="flex-end" flexWrap="wrap" useFlexGap>
               <TextField
                 size="small"
@@ -192,40 +153,77 @@ export function QuestionLibrary({ inUse = [], onPick, onClose }: {
               >
                 {USED_FILTERS.map((f) => <ToggleButton key={f.key} value={f.key}>{f.label}</ToggleButton>)}
               </ToggleButtonGroup>
-              <TextField select size="small" label="יחידה" value={unit} onChange={(e) => setUnit(e.target.value)} sx={{ width: 130 }}>
-                <MenuItem value="">כל היחידות</MenuItem>
-                {UNITS.map((u) => <MenuItem key={u} value={u}>{u}</MenuItem>)}
-              </TextField>
-              <TextField select size="small" label="נושא" value={topic} onChange={(e) => setTopic(e.target.value)} sx={{ flex: 1, minWidth: 160 }}>
-                <MenuItem value="">כל הנושאים</MenuItem>
-                {TOPICS.map((t) => <MenuItem key={t} value={t}>{t}</MenuItem>)}
-              </TextField>
-              <TextField select size="small" label="תת נושא" value={subTopic} onChange={(e) => setSubTopic(e.target.value)} sx={{ flex: 1, minWidth: 160 }}>
-                <MenuItem value="">הכל</MenuItem>
-                {SUBTOPICS.map((s) => <MenuItem key={s} value={s}>{s}</MenuItem>)}
-              </TextField>
               <TextField select size="small" label="רמה" value={difficulty} onChange={(e) => setDifficulty(e.target.value)} sx={{ width: 130 }}>
                 <MenuItem value="">כל הרמות</MenuItem>
                 {DIFFICULTIES.map((d) => <MenuItem key={d} value={d}>{d}</MenuItem>)}
+              </TextField>
+            </Stack>
+
+            {/* one line, each field narrowing the next: נושא → יחידה → תת נושא → תגיות */}
+            <Stack direction="row" spacing={2} alignItems="flex-end" flexWrap="wrap" useFlexGap>
+              <TextField select size="small" label="נושא" value={topic} onChange={(e) => pickTopic(e.target.value)} sx={{ flex: 1, minWidth: 160 }}>
+                <MenuItem value="">כל הנושאים</MenuItem>
+                {TOPICS.map((t) => <MenuItem key={t} value={t}>{t}</MenuItem>)}
+              </TextField>
+              {/* in order: a יחידה lives under a נושא, a תת נושא under a יחידה, tags under those */}
+              <TextField select size="small" label="יחידה" value={unit} onChange={(e) => pickUnit(e.target.value)} disabled={!topic} sx={{ flex: 1, minWidth: 160 }}>
+                <MenuItem value="">כל היחידות</MenuItem>
+                {UNITS_OF.map((u) => <MenuItem key={u} value={u}>{u}</MenuItem>)}
+              </TextField>
+              <TextField
+                select
+                size="small"
+                label="תת נושא"
+                disabled={!unit}
+                value={sections}
+                onChange={(e) => pickSections(typeof e.target.value === 'string' ? e.target.value.split(',') : (e.target.value as unknown as string[]))}
+                SelectProps={{
+                  multiple: true,
+                  displayEmpty: true,
+                  renderValue: (v) => {
+                    const picked2 = v as string[];
+                    if (picked2.length === 0) return 'כל תתי הנושאים';
+                    return picked2.length === 1 ? picked2[0] : `${picked2.length} תתי נושא נבחרו`;
+                  },
+                }}
+                InputLabelProps={{ shrink: true }}
+                sx={{ flex: 1, minWidth: 160 }}
+              >
+                {SECTIONS_OF.map((sec) => (
+                  <MenuItem key={sec} value={sec}>
+                    <Checkbox checked={sections.includes(sec)} />
+                    <ListItemText primary={sec} />
+                  </MenuItem>
+                ))}
               </TextField>
               {/* more than one tag can be on at a time */}
               <TextField
                 select
                 size="small"
                 label="תגיות"
+                disabled={sections.length === 0}
                 value={tags}
                 onChange={(e) => setTags(typeof e.target.value === 'string' ? e.target.value.split(',') : (e.target.value as unknown as string[]))}
-                SelectProps={{ multiple: true, displayEmpty: true, renderValue: (v) => (v as string[]).length ? (v as string[]).join(', ') : 'כל התגיות' }}
+                SelectProps={{
+                  multiple: true,
+                  displayEmpty: true,
+                  renderValue: (v) => {
+                    const picked2 = v as string[];
+                    if (picked2.length === 0) return 'כל התגיות';
+                    return picked2.length === 1 ? picked2[0] : `${picked2.length} תגיות נבחרו`;
+                  },
+                }}
                 InputLabelProps={{ shrink: true }}
                 sx={{ flex: 1, minWidth: 160 }}
               >
-                {QUESTION_TAGS.map((t) => (
+                {TAGS_OF.map((t) => (
                   <MenuItem key={t} value={t}>
                     <Checkbox checked={tags.includes(t)} />
                     <ListItemText primary={t} />
                   </MenuItem>
                 ))}
               </TextField>
+            </Stack>
             </Stack>
           </CardContent>
         </Card>
@@ -239,17 +237,22 @@ export function QuestionLibrary({ inUse = [], onPick, onClose }: {
         ) : (
           <Stack spacing={2}>
             {shown.map((x) => (
-              <LibraryCard
+              <QuestionPickCard
                 key={x.id}
                 q={x}
                 selected={picked?.id === x.id}
+                // one question is added at a time, so ticking one unticks the one before it
+                onToggle={() => setPicked(picked?.id === x.id ? null : x)}
+                onOpen={() => setReading(x)}
                 disabled={inUse.includes(x.prompt)}
-                onSelect={() => setPicked(picked?.id === x.id ? null : x)}
+                disabledNote="כבר במשימה"
               />
             ))}
           </Stack>
         )}
       </DialogContent>
+
+      {reading && <QuestionPreviewDialog q={reading} onClose={() => setReading(null)} />}
 
       <DialogActions sx={{ px: 3, py: 2 }}>
         <Button

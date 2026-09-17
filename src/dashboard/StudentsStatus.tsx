@@ -20,9 +20,9 @@ import SearchRounded from '@mui/icons-material/SearchRounded';
 import ChevronLeftRounded from '@mui/icons-material/ChevronLeftRounded';
 import ChevronRightRounded from '@mui/icons-material/ChevronRightRounded';
 import ShowChartRounded from '@mui/icons-material/ShowChartRounded';
-import { FREDOKA } from '../theme';
 import { ScoreDot, statusFill, statusBorder } from './ScoreDot';
 import { EmptyState } from './EmptyState';
+import { PageHeader } from './PageHeader';
 import { KindIcon, type Kind } from './KindIcon';
 import { STATUS_DATES, STATUS_ASSESSMENTS, STUDENT_STATUS, STATUS_LEGEND } from './mockData';
 
@@ -82,14 +82,7 @@ export function StudentsStatus({ variant = 'mid' }: { variant?: StudentsVariant 
   const visibleIdx = matchIdx.slice(start, start + visibleCols).reverse();
 
   const header = (
-    <Stack spacing={0.5}>
-      <Typography variant="h3" sx={{ ...FREDOKA, fontWeight: 600 }}>
-        מצב תלמידים
-      </Typography>
-      <Typography color="text.secondary">
-        מעקב מפורט אחר ביצועי התלמידים בהערכות שונות
-      </Typography>
-    </Stack>
+    <PageHeader title="מצב תלמידים" subtitle="מעקב מפורט אחר ביצועי התלמידים בהערכות שונות" />
   );
 
   if (variant === 'empty') {
