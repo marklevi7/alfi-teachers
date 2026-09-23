@@ -34,8 +34,10 @@ const SCREEN_VARIANTS: Partial<Record<Screen, ScreenVariant[]>> = {
     { key: 'empty', label: 'blank' },
   ],
   'build-test': [
-    { key: 'existing', label: 'ready tests' },
+    // split view is the real default now — a teacher lands here reading a test, not just
+    // scanning a list of titles
     { key: 'existing-v2', label: 'split view' },
+    { key: 'existing', label: 'ready tests' },
     { key: 'questions', label: 'pick questions' },
     { key: 'picked', label: 'questions picked' },
     { key: 'preview', label: 'test preview' },

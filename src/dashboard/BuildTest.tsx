@@ -112,7 +112,7 @@ export type BuildTestVariant = 'existing' | 'existing-v2' | 'questions' | 'picke
 const DEMO_PICKS = 3;
 
 /** בניית מבחן — the form, then one of two routes to the questions, then out to the class. */
-export function BuildTest({ variant = 'existing', onSend }: {
+export function BuildTest({ variant = 'existing-v2', onSend }: {
   variant?: BuildTestVariant;
   onSend: (test: ClassAssessment) => void;
 }) {
@@ -318,7 +318,9 @@ export function BuildTest({ variant = 'existing', onSend }: {
           // v2, the mail-client split: the shelf on one half, what a card holds on the other
           // the two halves fill what is left of the page and scroll on their own, the way a
           // mail client's list and reading pane do
-          <Box sx={{ flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
+          // the reading pane is where the teacher actually reads a test, so it gets the
+          // larger half — the shelf only has to fit a title and a line of meta per row
+          <Box sx={{ flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: { xs: '1fr', md: '2fr 3fr' }, gap: 2 }}>
             {/* the shelf scrolls inside its own half — a plain block scroller, so the cards
                 keep their height instead of being squeezed by the flex column */}
             <Box sx={{ minHeight: 0, overflowY: 'auto', pb: 1 }}>
