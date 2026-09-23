@@ -16,9 +16,6 @@ import Tooltip from '@mui/material/Tooltip';
 import DeleteOutlineRounded from '@mui/icons-material/DeleteOutlineRounded';
 import AddRounded from '@mui/icons-material/AddRounded';
 import HelpOutlineRounded from '@mui/icons-material/HelpOutlineRounded';
-import InfoOutlined from '@mui/icons-material/InfoOutlined';
-import LockOutlined from '@mui/icons-material/LockOutlined';
-import Chip from '@mui/material/Chip';
 import { FREDOKA } from '../theme';
 import { KindIcon } from './KindIcon';
 import { QNumber } from './QNumber';
@@ -26,6 +23,7 @@ import CardActionArea from '@mui/material/CardActionArea';
 import CloseRounded from '@mui/icons-material/CloseRounded';
 import { ClampedText } from './ClampedText';
 import { PageHeader, TaskTitle } from './PageHeader';
+import { ReadyMadeTag } from './ReadyMadeTag';
 import { StickyBar, BarSpacer, fillsPage } from './StickyBar';
 import { QuestionDetail, QuestionHeading } from './QuestionDetail';
 import { GraphThumb } from './GraphThumb';
@@ -87,31 +85,6 @@ function SectionTitle({ children, after }: { children: ReactNode; after?: ReactN
   );
 }
 
-/** what a ready-made test carries instead of its edit controls: a label, and why it is locked */
-function ReadyMadeTag({ kind }: { kind: string }) {
-  return (
-    <Stack direction="row" spacing={0.5} alignItems="center">
-      <Chip
-        size="small"
-        color="primary"
-        variant="outlined"
-        icon={<LockOutlined />}
-        label={kind === 'בוחן' ? 'מבחן מוכן' : 'תרגול מוכן'}
-        sx={{ fontWeight: 700 }}
-      />
-      <Tooltip
-        placement="top"
-        arrow
-        title={`ה${kind} נבנה מראש כיחידה סגורה — השאלות שבו נקבעו יחד ואי אפשר להוסיף או להסיר מהן. אפשר עדיין לשנות את השם, התאריך והשעות, או למחוק את המשימה כולה.`}
-      >
-        <IconButton size="small" aria-label="למה אי אפשר לערוך את השאלות">
-          <InfoOutlined fontSize="small" sx={{ color: 'text.secondary' }} />
-        </IconButton>
-      </Tooltip>
-    </Stack>
-  );
-}
-
 // A task that has not opened yet has no results to show, so this screen is the task itself:
 // the same fields the build form fills in, prefilled, plus the delete only a queued task
 // can offer. Replace the body with the shared בניית תרגול / בניית מבחן form once it exists.
@@ -125,8 +98,6 @@ export function ScheduledTask({ task, onBack, onSave, onDelete }: {
   const [opensOn, setOpensOn] = useState(task.opensOn);
   const [opensAt, setOpensAt] = useState(task.opensAt ?? '');
   const [closesAt, setClosesAt] = useState(task.closesAt ?? '');
-  // יח"ל is not edited here any more; the task keeps the one it was filed under
-  const unit = task.unit;
   const [topic, setTopic] = useState(task.topic);
   const [subTopic, setSubTopic] = useState(task.subTopic);
   const [sections, setSections] = useState<string[]>(() => sectionsOfAssessment(task));
@@ -411,7 +382,7 @@ export function ScheduledTask({ task, onBack, onSave, onDelete }: {
         )}
         <Button
           variant="contained"
-          onClick={() => onSave({ ...task, title, opensOn, opensAt, closesAt, unit, topic, subTopic, sections, tags })}
+          onClick={() => onSave({ ...task, title, opensOn, opensAt, closesAt, topic, subTopic, sections, tags })}
           sx={{ fontWeight: 800 }}
         >
           שמירה

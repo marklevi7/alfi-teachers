@@ -39,7 +39,13 @@ const CONTENT_MAX_WIDTH = 1120;
 
 // Shared chrome: sidebar nav (right in RTL) + main content area.
 // Every teacher screen renders inside this via `active` / `children`.
-export function Shell({ active, onNavigate, children }: { active: Screen; onNavigate: (s: NavKey) => void; children: ReactNode }) {
+export function Shell({ active, onNavigate, fill = false, children }: {
+  active: Screen;
+  onNavigate: (s: NavKey) => void;
+  /** a screen that scrolls its own panes instead of the page — it gets exactly the page, no more */
+  fill?: boolean;
+  children: ReactNode;
+}) {
   // Only one class exists in the current data — this becomes real filtering once more classes ship.
   const [classId, setClassId] = useState('י-1');
 
@@ -117,7 +123,17 @@ export function Shell({ active, onNavigate, children }: { active: Screen; onNavi
           by its own padding, so the vertical padding lives on the column inside instead —
           otherwise a sticky table header parks 48px down and rows show through the gap. */}
       <Box component="main" sx={{ flexGrow: 1, minWidth: 0, height: '100%', overflowY: 'auto', px: 6 }}>
-        <Box sx={{ maxWidth: CONTENT_MAX_WIDTH, mx: 'auto', py: 6 }}>
+        {/* a flex column at least as tall as the page. `fill` makes it exactly the page, so a
+            screen inside it can ask for `flex: 1` and scroll its own panes */}
+        <Box
+          sx={{
+            maxWidth: CONTENT_MAX_WIDTH, mx: 'auto', py: 6,
+            // only a `fill` screen becomes a flex column of exactly the page's height. Every
+            // other screen stays an ordinary block that grows with its content — in a flex
+            // column a tall card would be squeezed instead of scrolling the page
+            ...(fill && { height: '100%', display: 'flex', flexDirection: 'column' }),
+          }}
+        >
           {children}
         </Box>
       </Box>

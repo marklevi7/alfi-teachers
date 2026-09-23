@@ -1,15 +1,14 @@
 import { useMemo, useState } from 'react';
+import { alpha } from '@mui/material/styles';
+import Link from '@mui/material/Link';
+import Tooltip from '@mui/material/Tooltip';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import CardActionArea from '@mui/material/CardActionArea';
-import TextField from '@mui/material/TextField';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
-import MenuItem from '@mui/material/MenuItem';
-import Checkbox from '@mui/material/Checkbox';
-import ListItemText from '@mui/material/ListItemText';
 import SearchOffRounded from '@mui/icons-material/SearchOffRounded';
 import { QuestionPickCard } from './QuestionPickCard';
 import { QuestionPreviewDialog } from './QuestionPreviewDialog';
@@ -19,17 +18,16 @@ import { EmptyState } from './EmptyState';
 import Tabs from '@mui/material/Tabs';
 import Tab from '@mui/material/Tab';
 import {
-  QUESTION_LIBRARY, QUESTION_TAGS, CURRICULUM_TOPICS, unitsOf, sectionsOf, READY_TESTS, bankQuestionFor,
-  type Difficulty, type LibraryQuestion, type ReadyTest, type ClassAssessment,
+  QUESTION_LIBRARY, READY_TESTS, bankQuestionFor,
+  type LibraryQuestion, type ReadyTest, type ClassAssessment,
 } from './mockData';
 import { KindIcon } from './KindIcon';
+import { QuestionCard } from './TestQuestionCard';
+import { QuestionFilters, NO_FILTERS, matchesFilters } from './QuestionFilters';
+import { ReadyMadeTag } from './ReadyMadeTag';
 import { PageHeader } from './PageHeader';
 import { StickyBar, BarSpacer, fillsPage } from './StickyBar';
 
-const DIFFICULTIES: Difficulty[] = ['קל', 'בינוני', 'קשה'];
-
-// a test assembled question by question has no יח"ל field of its own yet
-const UNIT_FALLBACK = '5 יח"ל';
 
 const pad2 = (n: number) => String(n).padStart(2, '0');
 
@@ -64,12 +62,19 @@ const MODES: { key: Mode; label: string }[] = [
 
 /** one assessment the class already has, offered whole. Reading it is the way in — a card
     is a summary, not a click target, because a test is taken only after it has been read. */
-function ReadyTestCard({ t, onPreview }: { t: ReadyTest; onPreview: () => void }) {
+function ReadyTestCard({ t, onPreview, selected = false }: {
+  t: ReadyTest;
+  onPreview: () => void;
+  /** in the split view, the test the pane beside the list is showing */
+  selected?: boolean;
+}) {
   return (
     <Card
       variant="outlined"
       sx={{
         borderRadius: 3,
+        borderColor: selected ? 'primary.main' : 'divider',
+        ...(selected && { boxShadow: 4, bgcolor: (theme) => alpha(theme.palette.primary.main, 0.06) }),
         transition: (theme) => theme.transitions.create(['box-shadow', 'border-color']),
         '&:hover': { boxShadow: 4, borderColor: 'primary.main' },
         '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
@@ -87,7 +92,10 @@ function ReadyTestCard({ t, onPreview }: { t: ReadyTest; onPreview: () => void }
               <Typography variant="h6" sx={{ fontWeight: 800, lineHeight: 1.2 }}>{t.title}</Typography>
               <Typography sx={META}>{t.questions.length} שאלות</Typography>
             </Stack>
-            <Typography sx={{ ...META, mt: 1 }}>{t.unit} · {t.topic} · {t.subTopic}</Typography>
+            {/* the three levels a question sits under: נושא → יחידה → תת נושא */}
+            <Typography sx={{ ...META, mt: 1 }}>
+              {[t.topic, t.subTopic, t.sections.join(', ')].filter(Boolean).join(' · ')}
+            </Typography>
           </Box>
         </Stack>
       </CardActionArea>
@@ -95,61 +103,71 @@ function ReadyTestCard({ t, onPreview }: { t: ReadyTest; onPreview: () => void }
   );
 }
 
+/** The demo states of this screen, switched from the dev control bar: the two routes into
+    the questions, the assembly route with questions already on it, and the step that reads
+    a whole test. The screen is remounted on a switch, so each state opens clean. */
+export type BuildTestVariant = 'existing' | 'existing-v2' | 'questions' | 'picked' | 'preview';
+
+/** the questions a 'picked' demo opens with — the first few the library offers */
+const DEMO_PICKS = 3;
+
 /** בניית מבחן — the form, then one of two routes to the questions, then out to the class. */
-export function BuildTest({ onSend }: { onSend: (test: ClassAssessment) => void }) {
-  const [title, setTitle] = useState('');
+export function BuildTest({ variant = 'existing', onSend }: {
+  variant?: BuildTestVariant;
+  onSend: (test: ClassAssessment) => void;
+}) {
+  // a test read in full already carries its name; the other states start unnamed
+  const [title, setTitle] = useState(variant === 'preview' ? READY_TESTS[0].title : '');
   // a new test opens today unless the teacher says otherwise
   const [date, setDate] = useState(todayAppDate);
   // a test opens now and runs an hour, unless the teacher moves either end
   const [opensAt, setOpensAt] = useState(() => clockPlus(0));
   const [closesAt, setClosesAt] = useState(() => clockPlus(1));
   // what the test is made of: every question ticked in the table below
-  const [picked, setPicked] = useState<string[]>([]);
-  // the filters cascade right to left: a נושא decides the יחידות, a יחידה decides the תת נושאים
-  const [topic, setTopic] = useState('');
-  const [unit, setUnit] = useState('');
-  // more than one תת נושא can be on at a time
-  const [sections, setSections] = useState<string[]>([]);
+  const [picked, setPicked] = useState<string[]>(
+    () => (variant === 'picked' ? QUESTION_LIBRARY.slice(0, DEMO_PICKS).map((q) => q.id) : []),
+  );
+  // the filter box's own value: free text, history with the class, and the cascade
+  const [filters, setFilters] = useState(NO_FILTERS);
+  const { topic, unit, sections, tags, difficulty } = filters;
   // a teacher is offered what already exists first; building from questions is the other route
-  const [mode, setMode] = useState<Mode>('existing');
-  // these two stand outside the cascade — they cut across whatever branch is open
-  const [tags, setTags] = useState<string[]>([]);
-  const [difficulty, setDifficulty] = useState('');
+  const [mode, setMode] = useState<Mode>(
+    variant === 'questions' || variant === 'picked' ? 'questions' : 'existing',
+  );
+  // the shelf's second design: the list on one half, the test it opens on the other
+  const split = variant === 'existing-v2';
+  // which test the reading pane is showing; the first one on the shelf until another is clicked
+  const [openId, setOpenId] = useState<string | null>(null);
   // a question read in full, without having to pick it first
   const [preview, setPreview] = useState<LibraryQuestion | null>(null);
   // a whole test read end to end, the way the class will meet it
-  const [testPreview, setTestPreview] = useState<ReadyTest | null>(null);
-
-  const shown = useMemo(
-    () => QUESTION_LIBRARY.filter((q) =>
-      (!topic || q.topic === topic) &&
-      (!unit || q.subTopic === unit) &&
-      (sections.length === 0 || sections.includes(q.section)) &&
-      // several tags can be on at once; a question matches if it carries any of them
-      (tags.length === 0 || q.tags.some((t) => tags.includes(t))) &&
-      (!difficulty || q.difficulty === difficulty)
-    ),
-    [topic, unit, sections, tags, difficulty],
+  const [testPreview, setTestPreview] = useState<ReadyTest | null>(
+    variant === 'preview' ? READY_TESTS[0] : null,
   );
+
+  const shown = useMemo(() => QUESTION_LIBRARY.filter((q) => matchesFilters(q, filters)), [filters]);
 
   // the same filters, read against a whole test: its נושא, its יחידה, the תת נושאים and
   // difficulties its questions cover, and its tags
   const readyTests = useMemo(
     () => READY_TESTS.filter((t) =>
+      (!filters.q || t.title.includes(filters.q.trim())) &&
       (!topic || t.topic === topic) &&
       (!unit || t.subTopic === unit) &&
       (sections.length === 0 || t.sections.some((sec) => sections.includes(sec))) &&
       (tags.length === 0 || t.tags.some((tag) => tags.includes(tag))) &&
       (!difficulty || t.difficulties.includes(difficulty as never))
     ),
-    [topic, unit, sections, tags, difficulty],
+    [filters, topic, unit, sections, tags, difficulty],
   );
+
+  // the test the pane reads: the one clicked, while the filters still show it
+  const openTest = readyTests.find((t) => t.id === openId) ?? readyTests[0] ?? null;
 
   // the ticked questions, read as one test so the same preview can show them
   const draftTest: ReadyTest = {
     id: 'draft',
     title: title || 'המבחן שנבנה',
-    unit: '',
     topic: '',
     subTopic: '',
     tags: [],
@@ -194,10 +212,6 @@ export function BuildTest({ onSend }: { onSend: (test: ClassAssessment) => void 
   const [blocked, setBlocked] = useState(false);
   const send = () => (missing.length ? setBlocked(true) : setConfirmSend(true));
 
-  // a step back up the cascade drops what was chosen below it — it no longer exists there
-  const pickTopic = (next: string) => { setTopic(next); setUnit(''); setSections([]); };
-  const pickUnit = (next: string) => { setUnit(next); setSections([]); };
-
   const toggle = (id: string) =>
     setPicked(picked.includes(id) ? picked.filter((x) => x !== id) : [...picked, id]);
 
@@ -223,7 +237,6 @@ export function BuildTest({ onSend }: { onSend: (test: ClassAssessment) => void 
                 id: `new-${Date.now()}`,
                 title: outgoingName,
                 kind: 'בוחן',
-                unit: outgoing.unit || UNIT_FALLBACK,
                 topic: outgoing.topic || topic || 'כללי',
                 subTopic: outgoing.subTopic || unit || 'מעורב',
                 tags: outgoing.tags,
@@ -259,6 +272,8 @@ export function BuildTest({ onSend }: { onSend: (test: ClassAssessment) => void 
           action={{ label: 'שליחה לתלמידים', onClick: send }}
           // only a test being assembled can lose a question here
           onRemoveQuestion={previewingDraft ? (i: number) => setPicked(picked.filter((_, k) => k !== i)) : undefined}
+          // a test taken off the shelf says so, and says why its questions are fixed
+          readyMade={!previewingDraft}
           onClose={() => setTestPreview(null)}
         />
         {sendDialogs}
@@ -267,9 +282,11 @@ export function BuildTest({ onSend }: { onSend: (test: ClassAssessment) => void 
   }
 
   return (
-    // the screen fills the page, so the bar below it always lands on the bottom edge
-    <Box sx={fillsPage}>
-    <Stack spacing={3} sx={{ flex: 1 }}>
+    // the screen fills the page, so the bar below it always lands on the bottom edge. The
+    // split view goes further and takes exactly the page: its two halves scroll inside it,
+    // and the page itself does not move
+    <Box sx={split ? { ...fillsPage, minHeight: 0, flex: 1 } : fillsPage}>
+    <Stack spacing={3} sx={{ flex: 1, minHeight: 0 }}>
       <PageHeader icon={<KindIcon kind="בוחן" />} title="בניית מבחן" />
 
       {/* the first decision: a whole test that exists, or questions picked one by one.
@@ -282,102 +299,9 @@ export function BuildTest({ onSend }: { onSend: (test: ClassAssessment) => void 
         {MODES.map((m) => <Tab key={m.key} value={m.key} label={m.label} />)}
       </Tabs>
 
-      {/* a test already chosen leaves nothing to filter — the page is down to that one test */}
-      <Card variant="outlined" sx={{ borderRadius: 2 }}>
-        <CardContent>
-          {/* the cascade runs right to left: נושא → יחידה → תת נושא, then where to draw from.
-              Nothing to press — the table answers as each field changes. */}
-          <Stack direction="row" spacing={2} alignItems="flex-end" flexWrap="wrap" useFlexGap>
-            <TextField
-              select
-              size="small"
-              label="נושא"
-              value={topic}
-              onChange={(e) => pickTopic(e.target.value)}
-              sx={{ flex: 1, minWidth: 190 }}
-            >
-              <MenuItem value="">כל הנושאים</MenuItem>
-              {CURRICULUM_TOPICS.map((t) => <MenuItem key={t} value={t}>{t}</MenuItem>)}
-            </TextField>
-            <TextField
-              select
-              size="small"
-              label="יחידה"
-              value={unit}
-              onChange={(e) => pickUnit(e.target.value)}
-              disabled={!topic}
-              sx={{ flex: 1, minWidth: 190 }}
-            >
-              <MenuItem value="">כל היחידות</MenuItem>
-              {unitsOf(topic).map((u) => <MenuItem key={u} value={u}>{u}</MenuItem>)}
-            </TextField>
-            {/* several תתי נושא at once; the tick sits on the start side, as RTL puts it */}
-            <TextField
-              select
-              size="small"
-              label="תת נושא"
-              disabled={!unit}
-              value={sections}
-              onChange={(e) => setSections(typeof e.target.value === 'string' ? e.target.value.split(',') : (e.target.value as unknown as string[]))}
-              SelectProps={{
-                multiple: true,
-                displayEmpty: true,
-                renderValue: (v) => {
-                  const picked = v as string[];
-                  if (picked.length === 0) return 'כל תתי הנושאים';
-                  return picked.length === 1 ? picked[0] : `${picked.length} תתי נושא נבחרו`;
-                },
-              }}
-              InputLabelProps={{ shrink: true }}
-              sx={{ flex: 1, minWidth: 190 }}
-            >
-              {sectionsOf(topic, unit).map((sec) => (
-                <MenuItem key={sec} value={sec}>
-                  <Checkbox checked={sections.includes(sec)} />
-                  <ListItemText primary={sec} />
-                </MenuItem>
-              ))}
-            </TextField>
-            <TextField
-              select
-              size="small"
-              label="תגיות"
-              disabled={sections.length === 0}
-              value={tags}
-              onChange={(e) => setTags(typeof e.target.value === 'string' ? e.target.value.split(',') : (e.target.value as unknown as string[]))}
-              SelectProps={{
-                multiple: true,
-                displayEmpty: true,
-                renderValue: (v) => {
-                  const picked = v as string[];
-                  if (picked.length === 0) return 'כל התגיות';
-                  return picked.length === 1 ? picked[0] : `${picked.length} תגיות נבחרו`;
-                },
-              }}
-              InputLabelProps={{ shrink: true }}
-              sx={{ flex: 1, minWidth: 190 }}
-            >
-              {QUESTION_TAGS.map((t) => (
-                <MenuItem key={t} value={t}>
-                  <Checkbox checked={tags.includes(t)} />
-                  <ListItemText primary={t} />
-                </MenuItem>
-              ))}
-            </TextField>
-            <TextField
-              select
-              size="small"
-              label="רמת קושי"
-              value={difficulty}
-              onChange={(e) => setDifficulty(e.target.value)}
-              sx={{ width: 150 }}
-            >
-              <MenuItem value="">כל הרמות</MenuItem>
-              {DIFFICULTIES.map((d) => <MenuItem key={d} value={d}>{d}</MenuItem>)}
-            </TextField>
-          </Stack>
-        </CardContent>
-      </Card>
+      {/* the app's one filter box, shared with מאגר השאלות. A shelf of whole tests has no
+          history with the class to filter by */}
+      <QuestionFilters value={filters} onChange={setFilters} usage={mode === 'questions'} />
 
       {mode === 'existing' ? (
         readyTests.length === 0 ? (
@@ -390,11 +314,86 @@ export function BuildTest({ onSend }: { onSend: (test: ClassAssessment) => void 
             />
           </Card>
         ) : (
+        split ? (
+          // v2, the mail-client split: the shelf on one half, what a card holds on the other
+          // the two halves fill what is left of the page and scroll on their own, the way a
+          // mail client's list and reading pane do
+          <Box sx={{ flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
+            {/* the shelf scrolls inside its own half — a plain block scroller, so the cards
+                keep their height instead of being squeezed by the flex column */}
+            <Box sx={{ minHeight: 0, overflowY: 'auto', pb: 1 }}>
+            <Stack spacing={2}>
+              {readyTests.map((t) => (
+                <ReadyTestCard
+                  key={t.id}
+                  t={t}
+                  selected={t.id === openTest?.id}
+                  // a click reads the test beside the list instead of leaving the shelf
+                  onPreview={() => setOpenId(t.id)}
+                />
+              ))}
+            </Stack>
+            </Box>
+            {/* the reading pane: the test scrolls inside it, and the list beside it stays put */}
+            <Card
+              variant="outlined"
+              sx={{ borderRadius: 3, minHeight: 0, display: 'flex', flexDirection: 'column' }}
+            >
+              {openTest && (
+                <CardContent sx={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+                  <Stack spacing={2}>
+                    <Stack direction="row" spacing={2} alignItems="center">
+                      <KindIcon kind="בוחן" size="small" />
+                      {/* the name is the way out of the pane: it opens the test on the whole screen,
+                          exactly as clicking a card does on the other version */}
+                      <Tooltip title="פתיחת המבחן במסך מלא" placement="top" arrow>
+                        <Link
+                          component="button"
+                          type="button"
+                          variant="h6"
+                          underline="hover"
+                          color="inherit"
+                          onClick={() => openPreview(openTest)}
+                          sx={{ fontWeight: 800, lineHeight: 1.2, flex: 1, minWidth: 0, textAlign: 'start', cursor: 'pointer' }}
+                        >
+                          {openTest.title}
+                        </Link>
+                      </Tooltip>
+                      {/* a test off the shelf is a closed unit, and says so wherever it is read */}
+                      <ReadyMadeTag kind="בוחן" />
+                    </Stack>
+                    <Typography sx={META}>
+                      {[openTest.topic, openTest.subTopic, openTest.sections.join(', ')].filter(Boolean).join(' · ')}
+                      {' · '}{openTest.questions.length} שאלות
+                    </Typography>
+                    {/* the same question card the full preview uses. Here it is only read —
+                        the whole test opens from the name above, not question by question */}
+                    <Stack spacing={1.5}>
+                      {openTest.questions.map((q, i) => (
+                        <QuestionCard key={q} prompt={q} index={i} />
+                      ))}
+                    </Stack>
+                  </Stack>
+                </CardContent>
+              )}
+              {/* naming, timing and sending still happen on the full step; the way there rides
+                  the pane's bottom edge, so it is reachable without scrolling the test */}
+              {openTest && (
+                <Box sx={{ px: 2, py: 1.5, borderTop: 1, borderColor: 'divider', display: 'flex', justifyContent: 'flex-end' }}>
+                  <Button variant="contained" onClick={() => openPreview(openTest)} sx={{ fontWeight: 800 }}>
+                    המשך
+                  </Button>
+                </Box>
+              )}
+            </Card>
+          </Box>
+        ) : (
         <Stack spacing={2}>
           {readyTests.map((t) => (
             <ReadyTestCard key={t.id} t={t} onPreview={() => openPreview(t)} />
           ))}
         </Stack>
+        )
         )
       ) : (
       <>
@@ -431,7 +430,7 @@ export function BuildTest({ onSend }: { onSend: (test: ClassAssessment) => void 
 
       {preview && (
         <QuestionPreviewDialog
-          q={preview}
+          prompt={preview.prompt}
           selected={picked.includes(preview.id)}
           onToggleSelect={() => toggle(preview.id)}
           onClose={() => setPreview(null)}

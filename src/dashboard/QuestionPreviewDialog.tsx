@@ -10,7 +10,6 @@ import RemoveRounded from '@mui/icons-material/RemoveRounded';
 import CloseRounded from '@mui/icons-material/CloseRounded';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { useTheme } from '@mui/material/styles';
-import type { LibraryQuestion } from './mockData';
 import { QuestionDetail, QuestionHeading } from './QuestionDetail';
 
 /**
@@ -19,10 +18,12 @@ import { QuestionDetail, QuestionHeading } from './QuestionDetail';
  * frame around it, not part of the block.
  *
  * `onToggleSelect` is what makes it more than a reader: the header button ticks the question
- * in whatever list opened it. Leave it out and the dialog is read-only.
+ * in whatever list opened it. Leave it out and the dialog is read-only. `index` numbers the
+ * question when it is opened out of a test rather than out of the bank.
  */
-export function QuestionPreviewDialog({ q, selected = false, onToggleSelect, onClose }: {
-  q: LibraryQuestion;
+export function QuestionPreviewDialog({ prompt, index, selected = false, onToggleSelect, onClose }: {
+  prompt: string;
+  index?: number;
   selected?: boolean;
   onToggleSelect?: () => void;
   onClose: () => void;
@@ -40,7 +41,7 @@ export function QuestionPreviewDialog({ q, selected = false, onToggleSelect, onC
     >
       <DialogTitle component="div" sx={{ pb: 1 }}>
         <Stack direction="row" spacing={2} alignItems="center">
-          <QuestionHeading label="תצוגת השאלה" />
+          <QuestionHeading index={index} label={index === undefined ? 'תצוגת השאלה' : 'שאלה'} />
           <Box sx={{ flex: 1, minWidth: 0 }} />
           {/* picking the question is the point of reading it, so the action sits right here */}
           {onToggleSelect && (
@@ -60,7 +61,7 @@ export function QuestionPreviewDialog({ q, selected = false, onToggleSelect, onC
         </Stack>
       </DialogTitle>
       <DialogContent>
-        <QuestionDetail prompt={q.prompt} />
+        <QuestionDetail prompt={prompt} />
       </DialogContent>
     </Dialog>
   );

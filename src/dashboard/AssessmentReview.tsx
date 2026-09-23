@@ -35,7 +35,7 @@ import GroupsRounded from '@mui/icons-material/GroupsRounded';
 import TrendingUpRounded from '@mui/icons-material/TrendingUpRounded';
 import WarningAmberRounded from '@mui/icons-material/WarningAmberRounded';
 import FlagRounded from '@mui/icons-material/FlagRounded';
-import { deepPurple } from '@mui/material/colors';
+import { blue, deepPurple } from '@mui/material/colors';
 import { FREDOKA } from '../theme';
 import { ScoreDot, statusBorder } from './ScoreDot';
 import { KindIcon } from './KindIcon';
@@ -457,7 +457,8 @@ function NumberedAnswer({ text }: { text: string }) {
           <Typography
             component="span"
             variant="caption"
-            sx={{ minWidth: 16, textAlign: 'center', flexShrink: 0, color: (t) => alpha(t.palette.common.white, 0.7), fontWeight: 700, fontFeatureSettings: '"tnum","lnum"' }}
+            // same step number the student sees in their own bubble (SummaryDialog.tsx)
+            sx={{ minWidth: 16, textAlign: 'center', flexShrink: 0, color: blue[800], fontWeight: 700, fontFeatureSettings: '"tnum","lnum"' }}
           >
             {i + 1}
           </Typography>
@@ -473,12 +474,12 @@ function Turn({ turn }: { turn: AnswerTurn }) {
   const mine = turn.from === 'student';
   return (
     <Stack direction="row" spacing={1.25} alignItems="flex-start" justifyContent={mine ? 'flex-start' : 'flex-end'}>
-      {!mine && <AlfiAvatar size={36} />}
       <Box
         sx={{
           maxWidth: '85%', px: 2, py: 1.25, borderRadius: 3,
+          // the student app's two voices, unchanged: the student in blue, Alfi on grey
           ...(mine
-            ? { bgcolor: 'primary.main', color: 'primary.contrastText', borderStartStartRadius: 4 }
+            ? { bgcolor: blue[50], color: 'text.primary', borderStartStartRadius: 4 }
             : { bgcolor: 'grey.100', borderStartEndRadius: 4 }),
         }}
       >
@@ -492,6 +493,8 @@ function Turn({ turn }: { turn: AnswerTurn }) {
           </Stack>
         )}
       </Box>
+      {/* RTL: Alfi answers from the far end, after his bubble — the student app's own order */}
+      {!mine && <AlfiAvatar pose />}
     </Stack>
   );
 }

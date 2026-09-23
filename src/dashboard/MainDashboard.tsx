@@ -169,20 +169,26 @@ function ActivityPieCard({ empty }: { empty: boolean }) {
 
   return (
     <Card sx={heroCardSx}>
-      <CardContent sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
-        {/* icon, then title with the definition of "active" as its subtitle — the same
-            header shape the bottom panels use */}
-        <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 2 }}>
-          <PieChartRounded sx={{ color: 'primary.main' }} />
-          <Stack alignItems="flex-start" spacing={0.25}>
-            <Typography variant="h6" sx={{ ...FREDOKA, fontWeight: 600, lineHeight: 1.2 }}>
+      <CardContent sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column', '&:last-child': { pb: 2 } }}>
+        {/* same header line as תרגולים אחרונים beside it — identical padding, icon and type,
+            so the two titles sit on one line across the pair. The definition of "active"
+            hangs under the title, indented past the icon. */}
+        <Box sx={{ mb: 1.5 }}>
+          <Stack direction="row" spacing={1.5} alignItems="center">
+            <PieChartRounded sx={{ color: 'primary.main' }} />
+            <Typography variant="h6" sx={{ ...FREDOKA, fontWeight: 600 }}>
               סטטוס פעילות בשבוע האחרון
             </Typography>
-            <Typography variant="caption" color="text.secondary">
-              תלמיד פעיל אם ענה על שאלה בשבוע האחרון
-            </Typography>
           </Stack>
-        </Stack>
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            // icon (24) + the row's gap (12), so it starts where the title starts
+            sx={{ display: 'block', marginInlineStart: 4.5 }}
+          >
+            תלמיד פעיל אם ענה על שאלה בשבוע האחרון
+          </Typography>
+        </Box>
 
         {empty ? (
           <Stack sx={{ flexGrow: 1 }} justifyContent="center">

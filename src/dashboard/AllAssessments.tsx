@@ -91,8 +91,11 @@ function CompletionBar({ submitted }: { submitted: number }) {
   );
 }
 
-function AssessmentRow({ a, onOpen, onEdit, onDelete }: {
-  a: ClassAssessment; onOpen: () => void; onEdit: () => void; onDelete: () => void;
+function AssessmentRow({ a, highlight = false, onOpen, onEdit, onDelete }: {
+  a: ClassAssessment;
+  /** just sent or just saved — worth a glance before it becomes another row */
+  highlight?: boolean;
+  onOpen: () => void; onEdit: () => void; onDelete: () => void;
 }) {
   const queued = a.state === 'scheduled';
   const curriculum = [a.topic, a.subTopic, sectionsOfAssessment(a).join(', ')].filter(Boolean).join(' · ');
@@ -106,6 +109,18 @@ function AssessmentRow({ a, onOpen, onEdit, onDelete }: {
         transition: (t) => t.transitions.create(['box-shadow', 'border-color']),
         '&:hover': { boxShadow: 4, borderColor: 'primary.main' },
         '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
+        // the row that just arrived says so: three slow pulses, then it settles into the list
+        ...(highlight && {
+          '@keyframes arrived': {
+            '0%, 100%': { backgroundColor: 'transparent', borderColor: 'divider' },
+            '50%': {
+              backgroundColor: (t: Theme) => alpha(t.palette.primary.main, 0.12),
+              borderColor: 'primary.main',
+            },
+          },
+          animation: 'arrived 1s ease-in-out 3',
+          '@media (prefers-reduced-motion: reduce)': { animation: 'none' },
+        }),
       }}
     >
       <Stack direction="row" alignItems="stretch">
@@ -185,10 +200,14 @@ function AssessmentRow({ a, onOpen, onEdit, onDelete }: {
 // כל ההערכות — every task the class was given and every one still queued, on one timeline.
 // Same shape as the student app's תמונת מצב (History.tsx): filters on top, a vertical rail
 // down the inline start with a dot per row.
-export function AllAssessments({ variant = 'mid', items: all, onItemsChange, onOpenReview, onEditTask }: {
+export function AllAssessments({ variant = 'mid', items: all, onItemsChange, onDeleted, highlightId, onOpenReview, onEditTask }: {
   variant?: AllAssessmentsVariant;
   items: ClassAssessment[];
   onItemsChange: (next: ClassAssessment[]) => void;
+  /** the task the teacher just sent or saved, so the list can point at it */
+  highlightId?: string | null;
+  /** the app says so out loud — this screen only reports what it did */
+  onDeleted?: (task: ClassAssessment) => void;
   onOpenReview: (reviewIndex: number) => void;
   onEditTask: (id: string) => void;
 }) {
@@ -334,6 +353,7 @@ export function AllAssessments({ variant = 'mid', items: all, onItemsChange, onO
                 </Box>
                 <AssessmentRow
                   a={a}
+                  highlight={a.id === highlightId}
                   // a queued task opens its form; one that already went out opens its review
                   onOpen={() => (a.state === 'scheduled' ? onEditTask(a.id) : onOpenReview(a.reviewIndex))}
                   onEdit={() => onEditTask(a.id)}
@@ -350,7 +370,7 @@ export function AllAssessments({ variant = 'mid', items: all, onItemsChange, onO
           title={`למחוק את ${confirmDelete.kind === 'בוחן' ? 'הבוחן' : 'התרגול'}?`}
           body={`"${confirmDelete.title}" יימחק על כל שאלותיו ולא ניתן יהיה לשחזר אותו. המשימה לא תישלח לתלמידים.`}
           confirmLabel="מחיקה"
-          onConfirm={() => { remove(confirmDelete.id); setConfirmDelete(null); }}
+          onConfirm={() => { remove(confirmDelete.id); onDeleted?.(confirmDelete); setConfirmDelete(null); }}
           onClose={() => setConfirmDelete(null)}
         />
       )}

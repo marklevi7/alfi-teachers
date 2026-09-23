@@ -513,7 +513,7 @@ export type ClassAssessment = {
   id: string;
   title: string;
   kind: Kind;
-  unit: string;
+  // נושא → יחידה → תת נושא, and nothing above them
   topic: string;
   subTopic: string;
   tags: string[];
@@ -538,45 +538,41 @@ export type ClassAssessment = {
   readyMade?: boolean;
 };
 
-export const UNITS = ['5 יח"ל', '4 יח"ל', '3 יח"ל'];
 export const ASSESSMENT_TAGS = ['שיעורי בית', 'הכנה למבחן', 'חזרה', 'העשרה', 'תרגול כיתה'];
 
-// title / unit / topic / subTopic / tags for each column of the מצב תלמידים table, in the
+// title / topic / subTopic / tags for each column of the מצב תלמידים table, in the
 // same order — date and kind come from STATUS_ASSESSMENTS so the two screens agree.
-const ASSESSMENT_META: { unit: string; topic: string; subTopic: string; tags: string[] }[] = [
-  { unit: '5 יח"ל', topic: 'אלגברה', subTopic: 'משוואות ריבועיות', tags: ['שיעורי בית'] },
-  { unit: '5 יח"ל', topic: 'אלגברה', subTopic: 'פרבולה', tags: ['שיעורי בית', 'חזרה'] },
-  { unit: '5 יח"ל', topic: 'אלגברה', subTopic: 'משוואות ואי-שוויונות', tags: ['הכנה למבחן'] },
-  { unit: '5 יח"ל', topic: 'סדרות', subTopic: 'סדרה חשבונית', tags: ['שיעורי בית'] },
-  { unit: '5 יח"ל', topic: 'סדרות', subTopic: 'סדרה הנדסית', tags: ['שיעורי בית'] },
-  { unit: '5 יח"ל', topic: 'סדרות', subTopic: 'סכום סדרה', tags: ['הכנה למבחן'] },
-  { unit: '4 יח"ל', topic: 'טריגונומטריה', subTopic: 'משולש ישר זווית', tags: ['תרגול כיתה'] },
-  { unit: '5 יח"ל', topic: 'אנליזה', subTopic: 'פולינום ונגזרות', tags: ['שיעורי בית', 'הכנה למבחן'] },
-  { unit: '5 יח"ל', topic: 'גאומטריה אנליטית', subTopic: 'מרחק בין נקודות', tags: ['תרגול כיתה'] },
-  { unit: '4 יח"ל', topic: 'גאומטריה', subTopic: 'מרובעים ומעגל', tags: ['הכנה למבחן'] },
-  { unit: '5 יח"ל', topic: 'גאומטריה אנליטית', subTopic: 'משוואת הישר', tags: ['שיעורי בית'] },
-  { unit: '5 יח"ל', topic: 'אנליזה', subTopic: 'חקירת פונקציה', tags: ['חזרה', 'העשרה'] },
+const ASSESSMENT_META: { topic: string; subTopic: string; tags: string[] }[] = [
+  { topic: 'אלגברה', subTopic: 'משוואות ריבועיות', tags: ['שיעורי בית'] },
+  { topic: 'אלגברה', subTopic: 'פרבולה', tags: ['שיעורי בית', 'חזרה'] },
+  { topic: 'אלגברה', subTopic: 'משוואות ואי-שוויונות', tags: ['הכנה למבחן'] },
+  { topic: 'סדרות', subTopic: 'סדרה חשבונית', tags: ['שיעורי בית'] },
+  { topic: 'סדרות', subTopic: 'סדרה הנדסית', tags: ['שיעורי בית'] },
+  { topic: 'סדרות', subTopic: 'סכום סדרה', tags: ['הכנה למבחן'] },
+  { topic: 'טריגונומטריה', subTopic: 'משולש ישר זווית', tags: ['תרגול כיתה'] },
+  { topic: 'אנליזה', subTopic: 'פולינום ונגזרות', tags: ['שיעורי בית', 'הכנה למבחן'] },
+  { topic: 'גאומטריה אנליטית', subTopic: 'מרחק בין נקודות', tags: ['תרגול כיתה'] },
+  { topic: 'גאומטריה', subTopic: 'מרובעים ומעגל', tags: ['הכנה למבחן'] },
+  { topic: 'גאומטריה אנליטית', subTopic: 'משוואת הישר', tags: ['שיעורי בית'] },
+  { topic: 'אנליזה', subTopic: 'חקירת פונקציה', tags: ['חזרה', 'העשרה'] },
 ];
 
 // the demo is anchored on 26/08/26 — everything up to it has run, and three more are queued
 const SCHEDULED: ClassAssessment[] = [
   {
-    id: 's1', title: 'חקירת פונקציה רציונלית', kind: 'תרגול',
-    unit: '5 יח"ל', topic: 'אנליזה', subTopic: 'חקירת פונקציה', tags: ['שיעורי בית'],
+    id: 's1', title: 'חקירת פונקציה רציונלית', kind: 'תרגול', topic: 'אנליזה', subTopic: 'חקירת פונקציה', tags: ['שיעורי בית'],
     opensOn: '30/08/26', opensAt: '08:30', closesAt: '09:30',
     state: 'scheduled', reviewIndex: 4, submitted: 0, avgScore: null,
   },
   {
-    id: 's2', title: 'בוחן סיכום - אנליזה', kind: 'בוחן',
-    unit: '5 יח"ל', topic: 'אנליזה', subTopic: 'פולינום ונגזרות', tags: ['הכנה למבחן'],
+    id: 's2', title: 'בוחן סיכום - אנליזה', kind: 'בוחן', topic: 'אנליזה', subTopic: 'פולינום ונגזרות', tags: ['הכנה למבחן'],
     opensOn: '02/09/26', opensAt: '10:00', closesAt: '11:00',
     state: 'scheduled', reviewIndex: 0, submitted: 0, avgScore: null,
     // taken as-is from בחירה מהערכות קיימות, so its questions cannot be touched
     readyMade: true,
   },
   {
-    id: 's3', title: 'חזרה לקראת מתכונת', kind: 'תרגול',
-    unit: '5 יח"ל', topic: 'חזרה כללית', subTopic: 'מעורב', tags: ['חזרה', 'הכנה למבחן'],
+    id: 's3', title: 'חזרה לקראת מתכונת', kind: 'תרגול', topic: 'חזרה כללית', subTopic: 'מעורב', tags: ['חזרה', 'הכנה למבחן'],
     opensOn: '06/09/26', opensAt: '13:15', closesAt: '14:15',
     state: 'scheduled', reviewIndex: 3, submitted: 0, avgScore: null,
   },
@@ -586,8 +582,7 @@ const SCHEDULED: ClassAssessment[] = [
 // completion scale, which nothing else in the demo reaches.
 const OPEN_NOW: ClassAssessment[] = [
   {
-    id: 'o1', title: 'תרגול אסימפטוטות', kind: 'תרגול',
-    unit: '5 יח"ל', topic: 'אנליזה', subTopic: 'חקירת פונקציה', tags: ['שיעורי בית'],
+    id: 'o1', title: 'תרגול אסימפטוטות', kind: 'תרגול', topic: 'אנליזה', subTopic: 'חקירת פונקציה', tags: ['שיעורי בית'],
     opensOn: '26/08/26', opensAt: '08:30', closesAt: '09:30',
     state: 'open', reviewIndex: 4, submitted: 6, avgScore: 64,
   },
@@ -616,7 +611,6 @@ const PAST: ClassAssessment[] = STATUS_ASSESSMENTS.map((a, i) => {
     id: `a${i}`,
     title: a.title,
     kind: a.kind,
-    unit: meta.unit,
     topic: meta.topic,
     subTopic: meta.subTopic,
     tags: meta.tags,
@@ -666,7 +660,6 @@ export type LibraryQuestion = {
   id: string;
   prompt: string;
   difficulty: Difficulty;
-  unit: string;
   topic: string;
   subTopic: string;
   tags: string[];
@@ -691,7 +684,6 @@ const USED: LibrarySeed[] = RECENT_PRACTICES.flatMap((p, pi) => {
     id: `u${pi}-${qi}`,
     prompt: q.prompt,
     difficulty: q.difficulty,
-    unit: meta.unit,
     topic: meta.topic,
     subTopic: meta.subTopic,
     tags: [QUESTION_TAGS[(pi + qi) % QUESTION_TAGS.length]],
@@ -712,28 +704,28 @@ const FRESH: LibrarySeed[] = [
       + 'ה. קבע את תחומי העלייה והירידה.\n'
       + 'ו. שרטט סקיצה של גרף הפונקציה לפי הסעיפים הקודמים.\n'
       + 'ז. כמה פתרונות יש למשוואה f(x) = k עבור k = 0? נמק.',
-    difficulty: 'קשה', unit: '5 יח"ל', topic: 'אנליזה', subTopic: 'חקירת פונקציה',
+    difficulty: 'קשה', topic: 'אנליזה', subTopic: 'חקירת פונקציה',
     tags: ['בגרות', 'שאלה ארוכה'], usedIn: [],
     solution: 'א. המכנה מתאפס ב-x = 1, ולכן תחום ההגדרה הוא x ≠ 1\nב. עם ציר ה-x: x² − 4 = 0 ⟵ x = 2, x = −2, כלומר (2, 0) ו-(−2, 0)\nעם ציר ה-y: f(0) = (−4)/(−1) = 4, כלומר (0, 4)\nג. אסימפטוטה אנכית: x = 1 (שם המכנה מתאפס והמונה לא)\nחילוק: x² − 4 = (x − 1)(x + 1) − 3, ולכן f(x) = x + 1 − 3/(x − 1)\nהאסימפטוטה המשופעת היא y = x + 1\nד. f′(x) = (x² − 2x + 4)/(x − 1)² = 1 + 3/(x − 1)²\nהמונה x² − 2x + 4 = (x − 1)² + 3 חיובי תמיד, ולכן אין נקודות קיצון\nה. הנגזרת חיובית בכל תחום ההגדרה: הפונקציה עולה בכל אחד מהענפים,\nב-(−∞, 1) וב-(1, ∞), ואין תחומי ירידה\nו. שני ענפים עולים משני צדי x = 1, שניהם מתקרבים לישר y = x + 1\nז. f(x) = 0 כאשר x² − 4 = 0, כלומר x = 2 ו-x = −2 — שני פתרונות',
   },
   {
     id: 'n1', prompt: 'נתונה הפונקציה f(x) = x⁴ − 8x² + 7.\nא. מצא את נקודות הקיצון.\nב. קבע את סוג כל נקודת קיצון.',
-    difficulty: 'קשה', unit: '5 יח"ל', topic: 'אנליזה', subTopic: 'פולינום ונגזרות', tags: ['בגרות'], usedIn: [],
+    difficulty: 'קשה', topic: 'אנליזה', subTopic: 'פולינום ונגזרות', tags: ['בגרות'], usedIn: [],
     solution: 'f′(x) = 4x³ − 16x = 4x(x² − 4)\nנשווה לאפס: x = 0, x = 2, x = −2\nf(0) = 7, f(2) = 16 − 32 + 7 = −9, f(−2) = −9\nf″(x) = 12x² − 16\nf″(0) = −16 < 0 ⟵ (0, 7) מקסימום\nf″(±2) = 32 > 0 ⟵ (2, −9) ו-(−2, −9) מינימום',
   },
   {
     id: 'n2', prompt: 'גזור את הפונקציה f(x) = (2x + 1)(x − 3).',
-    difficulty: 'קל', unit: '5 יח"ל', topic: 'אנליזה', subTopic: 'פולינום ונגזרות', tags: ['שאלה קצרה', 'חובה'], usedIn: [],
+    difficulty: 'קל', topic: 'אנליזה', subTopic: 'פולינום ונגזרות', tags: ['שאלה קצרה', 'חובה'], usedIn: [],
     solution: 'נפתח סוגריים: f(x) = 2x² − 5x − 3\nנגזור איבר איבר: f′(x) = 4x − 5\nבדיקה בכלל המכפלה: 2(x − 3) + (2x + 1) = 4x − 5',
   },
   {
     id: 'n3', prompt: 'נתונות הנקודות A(−2, 1), B(4, 9).\nמצא את אורך הקטע AB ואת אמצעו.',
-    difficulty: 'קל', unit: '5 יח"ל', topic: 'גאומטריה אנליטית', subTopic: 'מרחק בין נקודות', tags: ['חובה'], usedIn: [],
+    difficulty: 'קל', topic: 'גאומטריה אנליטית', subTopic: 'מרחק בין נקודות', tags: ['חובה'], usedIn: [],
     solution: 'הפרש ה-x: 4 − (−2) = 6, הפרש ה-y: 9 − 1 = 8\nAB = √(6² + 8²) = √100 = 10\nאמצע הקטע: ((−2 + 4)/2, (1 + 9)/2) = (1, 5)',
   },
   {
     id: 'n4', prompt: 'מצא את משוואת המעגל שמרכזו (2, −1) ורדיוסו 5.\nבדוק אם הנקודה (5, 3) נמצאת עליו.',
-    difficulty: 'בינוני', unit: '5 יח"ל', topic: 'גאומטריה אנליטית', subTopic: 'מעגל', tags: ['בגרות'], usedIn: [],
+    difficulty: 'בינוני', topic: 'גאומטריה אנליטית', subTopic: 'מעגל', tags: ['בגרות'], usedIn: [],
     solution: 'משוואת מעגל שמרכזו (a, b) ורדיוסו r היא (x − a)² + (y − b)² = r²\nלכן: (x − 2)² + (y + 1)² = 25\nנציב את (5, 3): (5 − 2)² + (3 + 1)² = 9 + 16 = 25\nהשוויון מתקיים, ולכן הנקודה נמצאת על המעגל',
   },
   {
@@ -746,38 +738,38 @@ const FRESH: LibrarySeed[] = [
       + 'ב. בטא את זמן הנסיעה בפועל, כולל העצירה.\n'
       + 'ג. מצא את המהירות המקורית של הרכבת.\n'
       + 'ד. כמה זמן ארכה הנסיעה בפועל?',
-    difficulty: 'קשה', unit: '5 יח"ל', topic: 'אלגברה', subTopic: 'בעיות תנועה',
+    difficulty: 'קשה', topic: 'אלגברה', subTopic: 'בעיות תנועה',
     tags: ['בגרות', 'שאלה ארוכה'], usedIn: [],
     solution: 'א. נסמן ב-x את המהירות המקורית. זמן הנסיעה המתוכנן הוא 240/x שעות\nב. בשעה הראשונה עברה הרכבת x ק"מ, לאחריה עצרה 45 דקות = 3/4 שעה,\nואת שארית הדרך, 240 − x ק"מ, עברה במהירות x + 20\nזמן הנסיעה בפועל: 1 + 3/4 + (240 − x)/(x + 20)\nג. הרכבת הגיעה בזמן, ולכן: 1 + 3/4 + (240 − x)/(x + 20) = 240/x\nנכפול ב-4x(x + 20): 7x(x + 20) + 4x(240 − x) = 960(x + 20)\n7x² + 140x + 960x − 4x² = 960x + 19200\n3x² + 140x − 19200 = 0\nלפי נוסחת השורשים: x = (−140 + 500)/6 = 60\nהמהירות המקורית היא 60 קמ"ש\nד. 1 + 3/4 + 180/80 = 1 + 0.75 + 2.25 = 4 שעות, כמו הזמן המתוכנן 240/60',
   },
   {
     id: 'n5', prompt: 'הוכח שסכום הזוויות במשולש שווה ל-180°.',
-    difficulty: 'בינוני', unit: '4 יח"ל', topic: 'גאומטריה', subTopic: 'משולשים', tags: ['הוכחה'], usedIn: [],
+    difficulty: 'בינוני', topic: 'גאומטריה', subTopic: 'משולשים', tags: ['הוכחה'], usedIn: [],
     solution: 'נעביר דרך הקודקוד A ישר המקביל לצלע BC\nהזווית שבין הישר לצלע AB שווה ל-∠B (זוויות מתחלפות)\nהזווית שבין הישר לצלע AC שווה ל-∠C (זוויות מתחלפות)\nשלוש הזוויות שליד הקודקוד A משלימות לישר, כלומר ל-180°\nלכן ∠A + ∠B + ∠C = 180°',
   },
   {
     id: 'n6', prompt: 'במקבילית ABCD נתון ∠A = 70°.\nחשב את שאר הזוויות ונמק.',
-    difficulty: 'קל', unit: '4 יח"ל', topic: 'גאומטריה', subTopic: 'מרובעים ומעגל', tags: ['שאלה קצרה'], usedIn: [],
+    difficulty: 'קל', topic: 'גאומטריה', subTopic: 'מרובעים ומעגל', tags: ['שאלה קצרה'], usedIn: [],
     solution: 'במקבילית זוויות נגדיות שוות: ∠C = ∠A = 70°\nזוויות סמוכות במקבילית משלימות ל-180° (זוויות חד-צדדיות בין מקבילים)\n∠B = 180° − 70° = 110°, וכן ∠D = 110°\nבדיקה: 70 + 110 + 70 + 110 = 360°',
   },
   {
     id: 'n7', prompt: 'סדרה חשבונית: a₁ = 4 והפרשה 3.\nמצא את האיבר ה-20 ואת סכום 20 האיברים הראשונים.',
-    difficulty: 'בינוני', unit: '5 יח"ל', topic: 'סדרות', subTopic: 'סדרה חשבונית', tags: ['חובה'], usedIn: [],
+    difficulty: 'בינוני', topic: 'סדרות', subTopic: 'סדרה חשבונית', tags: ['חובה'], usedIn: [],
     solution: 'האיבר הכללי: aₙ = a₁ + (n − 1)d\na₂₀ = 4 + 19·3 = 61\nסכום סדרה חשבונית: Sₙ = n(a₁ + aₙ)/2\nS₂₀ = 20(4 + 61)/2 = 650',
   },
   {
     id: 'n8', prompt: 'בסדרה הנדסית a₁ = 3 ומנתה 2.\nמצא את סכום 8 האיברים הראשונים.',
-    difficulty: 'בינוני', unit: '5 יח"ל', topic: 'סדרות', subTopic: 'סדרה הנדסית', tags: ['בגרות'], usedIn: [],
+    difficulty: 'בינוני', topic: 'סדרות', subTopic: 'סדרה הנדסית', tags: ['בגרות'], usedIn: [],
     solution: 'סכום סדרה הנדסית: Sₙ = a₁(qⁿ − 1)/(q − 1)\nS₈ = 3(2⁸ − 1)/(2 − 1)\n2⁸ = 256, ולכן S₈ = 3·255 = 765',
   },
   {
     id: 'n9', prompt: 'במשולש ישר זווית הניצבים הם 6 ו-8.\nחשב את היתר ואת הזווית שמול הניצב הקטן.',
-    difficulty: 'קל', unit: '4 יח"ל', topic: 'טריגונומטריה', subTopic: 'משולש ישר זווית', tags: ['חובה', 'שאלה קצרה'], usedIn: [],
+    difficulty: 'קל', topic: 'טריגונומטריה', subTopic: 'משולש ישר זווית', tags: ['חובה', 'שאלה קצרה'], usedIn: [],
     solution: 'לפי משפט פיתגורס: היתר² = 6² + 8² = 100\nהיתר = 10\nהזווית שמול הניצב הקטן: tan α = 6/8 = 0.75\nα = 36.87° ≈ 36.9°',
   },
   {
     id: 'n10', prompt: 'הוכח כי בכל מעגל, זווית היקפית שווה למחצית הזווית המרכזית הנשענת על אותה קשת.',
-    difficulty: 'קשה', unit: '5 יח"ל', topic: 'גאומטריה', subTopic: 'מרובעים ומעגל', tags: ['הוכחה', 'העשרה'], usedIn: [],
+    difficulty: 'קשה', topic: 'גאומטריה', subTopic: 'מרובעים ומעגל', tags: ['הוכחה', 'העשרה'], usedIn: [],
     solution: 'נסמן את הזווית ההיקפית ∠BAC = α, ונעביר את הרדיוס OA\nהמשולש OAB שווה שוקיים (OA = OB רדיוסים), ולכן זוויות הבסיס שוות\nהזווית המרכזית ∠BOC היא זווית חיצונית למשולש OAB\nזווית חיצונית שווה לסכום שתי הזוויות הפנימיות שאינן צמודות לה\nלכן ∠BOC = α + α = 2α\nכלומר הזווית ההיקפית שווה למחצית הזווית המרכזית הנשענת על אותה קשת',
   },
 ];
@@ -794,7 +786,6 @@ export const QUESTION_LIBRARY: LibraryQuestion[] = [...FRESH, ...USED].map((q, i
 export type ReadyTest = {
   id: string;
   title: string;
-  unit: string;
   topic: string;
   subTopic: string;
   tags: string[];
@@ -825,7 +816,6 @@ export const READY_TESTS: ReadyTest[] = CLASS_ASSESSMENTS.map((a) => {
   return {
     id: a.id,
     title: a.title,
-    unit: a.unit,
     topic: a.topic,
     subTopic: a.subTopic,
     tags: a.tags,

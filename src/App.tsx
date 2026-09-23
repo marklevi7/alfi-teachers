@@ -6,9 +6,10 @@ import { StudentsStatus, type StudentsVariant } from './dashboard/StudentsStatus
 import { AssessmentReview, type ReviewVariant } from './dashboard/AssessmentReview';
 import { AllAssessments, type AllAssessmentsVariant } from './dashboard/AllAssessments';
 import { ScheduledTask } from './dashboard/ScheduledTask';
-import { BuildTest } from './dashboard/BuildTest';
+import { BuildTest, type BuildTestVariant } from './dashboard/BuildTest';
 import { CLASS_ASSESSMENTS, type ClassAssessment } from './dashboard/mockData';
 import { BlankScreen } from './dashboard/BlankScreen';
+import { Toast, type ToastMessage } from './dashboard/Toast';
 import { ControlBar, type Device, type ScreenVariant } from './dashboard/ControlBar';
 import type { MainVariant } from './dashboard/MainDashboard';
 
@@ -32,6 +33,13 @@ const SCREEN_VARIANTS: Partial<Record<Screen, ScreenVariant[]>> = {
     { key: 'mid', label: 'mid-use' },
     { key: 'empty', label: 'blank' },
   ],
+  'build-test': [
+    { key: 'existing', label: 'ready tests' },
+    { key: 'existing-v2', label: 'split view' },
+    { key: 'questions', label: 'pick questions' },
+    { key: 'picked', label: 'questions picked' },
+    { key: 'preview', label: 'test preview' },
+  ],
 };
 
 export function App() {
@@ -46,6 +54,15 @@ export function App() {
   const [showBar, setShowBar] = useState(false);
   const [device, setDevice] = useState<Device>('desktop');
   const [variant, setVariant] = useState('mid');
+  // the app's one confirmation line: sent, saved, deleted
+  const [toast, setToast] = useState<ToastMessage>(null);
+  // the task the list should point at for a moment after it lands there
+  const [highlightId, setHighlightId] = useState<string | null>(null);
+  // three slow pulses is about three seconds; after that it is just another row
+  const pointAt = (id: string) => {
+    setHighlightId(id);
+    window.setTimeout(() => setHighlightId((current) => (current === id ? null : current)), 3500);
+  };
 
   const variants = SCREEN_VARIANTS[screen] ?? [];
 
@@ -88,7 +105,12 @@ export function App() {
         <Box sx={{ flexGrow: 1, minHeight: 0 }}>
           {/* סקירת הערכה has no nav item of its own — it belongs to תוצאות הערכות, so that
               item stays lit however the teacher got here */}
-          <Shell active={screen === 'assessment-review' || screen === 'scheduled-task' ? 'results' : screen} onNavigate={navigate}>
+          <Shell
+            active={screen === 'assessment-review' || screen === 'scheduled-task' ? 'results' : screen}
+            onNavigate={navigate}
+            // the split view scrolls its two halves itself, so the page must not scroll too
+            fill={screen === 'build-test' && variant === 'existing-v2'}
+          >
             {screen === 'main' ? (
               <TeacherMain
                 variant={variant as MainVariant}
@@ -118,18 +140,27 @@ export function App() {
                 onSave={(next) => {
                   setAssessments(assessments.map((a) => (a.id === next.id ? next : a)));
                   setScreen('results');
+                  setToast({ text: 'השינויים נשמרו' });
+                  pointAt(next.id);
                 }}
                 onDelete={() => {
                   setAssessments(assessments.filter((a) => a.id !== scheduled.id));
                   setScreen('results');
+                  setToast({ text: `${scheduled.kind === 'בוחן' ? 'המבחן' : 'התרגול'} נמחק`, severity: 'info' });
                 }}
               />
             ) : screen === 'build-test' ? (
               <BuildTest
+                // each demo state opens the screen clean, so switching states never leaves
+                // a half-filled form behind
+                key={variant}
+                variant={variant as BuildTestVariant}
                 // a sent test joins כל ההערכות as a scheduled one, and the screen follows it there
                 onSend={(next) => {
                   setAssessments([next, ...assessments]);
                   setScreen('results');
+                  setToast({ text: 'המבחן נשלח' });
+                  pointAt(next.id);
                 }}
               />
             ) : screen === 'results' ? (
@@ -137,6 +168,8 @@ export function App() {
                 variant={variant as AllAssessmentsVariant}
                 items={assessments}
                 onItemsChange={setAssessments}
+                highlightId={highlightId}
+                onDeleted={(a) => setToast({ text: `"${a.title}" נמחק`, severity: 'info' })}
                 onEditTask={(id) => { setScheduledId(id); setScreen('scheduled-task'); }}
                 onOpenReview={(i) => {
                   setAssessment(i);
@@ -151,6 +184,7 @@ export function App() {
           </Shell>
         </Box>
       )}
+      <Toast message={toast} onClose={() => setToast(null)} />
     </Box>
   );
 }
