@@ -780,12 +780,13 @@ export const QUESTION_LIBRARY: LibraryQuestion[] = [...FRESH, ...USED].map((q, i
   return { ...q, section: options[i % options.length] };
 });
 
-/* ---------- assessments a teacher can take as they are, for בניית מבחן ---------- */
+/* ---------- assessments a teacher can take as they are, for בניית מבחן / בניית תרגול ---------- */
 
-// no kind on it: everything offered in בניית מבחן is a test. A תרגול is built in בניית תרגול.
+// kind decides which builder offers it — בניית מבחן shows only 'בוחן', בניית תרגול only 'תרגול'
 export type ReadyTest = {
   id: string;
   title: string;
+  kind: Kind;
   topic: string;
   subTopic: string;
   tags: string[];
@@ -816,6 +817,7 @@ export const READY_TESTS: ReadyTest[] = CLASS_ASSESSMENTS.map((a) => {
   return {
     id: a.id,
     title: a.title,
+    kind: a.kind,
     topic: a.topic,
     subTopic: a.subTopic,
     tags: a.tags,

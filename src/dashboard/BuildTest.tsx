@@ -21,7 +21,7 @@ import {
   QUESTION_LIBRARY, READY_TESTS, bankQuestionFor,
   type LibraryQuestion, type ReadyTest, type ClassAssessment,
 } from './mockData';
-import { KindIcon } from './KindIcon';
+import { KindIcon, type Kind } from './KindIcon';
 import { QuestionCard } from './TestQuestionCard';
 import { QuestionFilters, NO_FILTERS, matchesFilters } from './QuestionFilters';
 import { ReadyMadeTag } from './ReadyMadeTag';
@@ -51,6 +51,10 @@ const META = {
   color: 'text.secondary',
 } as const;
 
+// the type's own value is 'בוחן'; every screen actually calls it "מבחן" — the same split
+// ReadyMadeTag already reads by
+const NOUN: Record<Kind, string> = { בוחן: 'מבחן', תרגול: 'תרגול' };
+
 // the first decision of the screen: take a whole test that exists, or build one question
 // by question. Everything below the tabs belongs to whichever route is open.
 type Mode = 'questions' | 'existing';
@@ -62,8 +66,9 @@ const MODES: { key: Mode; label: string }[] = [
 
 /** one assessment the class already has, offered whole. Reading it is the way in — a card
     is a summary, not a click target, because a test is taken only after it has been read. */
-function ReadyTestCard({ t, onPreview, selected = false }: {
+function ReadyTestCard({ t, kind, onPreview, selected = false }: {
   t: ReadyTest;
+  kind: Kind;
   onPreview: () => void;
   /** in the split view, the test the pane beside the list is showing */
   selected?: boolean;
@@ -84,8 +89,7 @@ function ReadyTestCard({ t, onPreview, selected = false }: {
       <CardActionArea onClick={onPreview} sx={{ px: 3, py: 2.5 }}>
         <Stack direction="row" spacing={2} alignItems="flex-start">
           <Box sx={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
-            {/* always the test glyph — a תרגול is not built here */}
-            <KindIcon kind="בוחן" size="small" />
+            <KindIcon kind={kind} size="small" />
           </Box>
           <Box sx={{ flex: 1, minWidth: 0 }}>
             <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" useFlexGap>
@@ -111,18 +115,27 @@ export type BuildTestVariant = 'existing' | 'existing-v2' | 'questions' | 'picke
 /** the questions a 'picked' demo opens with — the first few the library offers */
 const DEMO_PICKS = 3;
 
-/** בניית מבחן — the form, then one of two routes to the questions, then out to the class. */
-export function BuildTest({ variant = 'existing-v2', onSend }: {
+/** the demo's first ready-made item of this kind — 'preview' opens on it named already */
+const firstReadyOf = (kind: Kind) => READY_TESTS.find((t) => t.kind === kind) ?? READY_TESTS[0];
+
+/** בניית מבחן / בניית תרגול — the form, then one of two routes to the questions, then out to
+    the class. One component behind both screens: only the kind and its wording differ. */
+export function BuildTest({ kind, variant = 'existing-v2', onSend }: {
+  /** which builder this is — decides the glyph, every "מבחן"/"תרגול" word, and which ready
+      assessments the shelf offers */
+  kind: Kind;
   variant?: BuildTestVariant;
   onSend: (test: ClassAssessment) => void;
 }) {
+  const noun = NOUN[kind];
   // a test read in full already carries its name; the other states start unnamed
-  const [title, setTitle] = useState(variant === 'preview' ? READY_TESTS[0].title : '');
+  const [title, setTitle] = useState(variant === 'preview' ? firstReadyOf(kind).title : '');
   // a new test opens today unless the teacher says otherwise
   const [date, setDate] = useState(todayAppDate);
-  // a test opens now and runs an hour, unless the teacher moves either end
+  // a test opens now and runs an hour, unless the teacher moves either end. A תרגול has no
+  // closing time by default — it stays open until the teacher decides otherwise
   const [opensAt, setOpensAt] = useState(() => clockPlus(0));
-  const [closesAt, setClosesAt] = useState(() => clockPlus(1));
+  const [closesAt, setClosesAt] = useState(() => (kind === 'תרגול' ? '' : clockPlus(1)));
   // what the test is made of: every question ticked in the table below
   const [picked, setPicked] = useState<string[]>(
     () => (variant === 'picked' ? QUESTION_LIBRARY.slice(0, DEMO_PICKS).map((q) => q.id) : []),
@@ -142,15 +155,17 @@ export function BuildTest({ variant = 'existing-v2', onSend }: {
   const [preview, setPreview] = useState<LibraryQuestion | null>(null);
   // a whole test read end to end, the way the class will meet it
   const [testPreview, setTestPreview] = useState<ReadyTest | null>(
-    variant === 'preview' ? READY_TESTS[0] : null,
+    variant === 'preview' ? firstReadyOf(kind) : null,
   );
 
   const shown = useMemo(() => QUESTION_LIBRARY.filter((q) => matchesFilters(q, filters)), [filters]);
 
   // the same filters, read against a whole test: its נושא, its יחידה, the תת נושאים and
-  // difficulties its questions cover, and its tags
+  // difficulties its questions cover, and its tags. The shelf only ever offers this builder's
+  // own kind — a תרגול builder never lists a בוחן, and the other way around
   const readyTests = useMemo(
     () => READY_TESTS.filter((t) =>
+      t.kind === kind &&
       (!filters.q || t.title.includes(filters.q.trim())) &&
       (!topic || t.topic === topic) &&
       (!unit || t.subTopic === unit) &&
@@ -158,7 +173,7 @@ export function BuildTest({ variant = 'existing-v2', onSend }: {
       (tags.length === 0 || t.tags.some((tag) => tags.includes(tag))) &&
       (!difficulty || t.difficulties.includes(difficulty as never))
     ),
-    [filters, topic, unit, sections, tags, difficulty],
+    [kind, filters, topic, unit, sections, tags, difficulty],
   );
 
   // the test the pane reads: the one clicked, while the filters still show it
@@ -167,7 +182,8 @@ export function BuildTest({ variant = 'existing-v2', onSend }: {
   // the ticked questions, read as one test so the same preview can show them
   const draftTest: ReadyTest = {
     id: 'draft',
-    title: title || 'המבחן שנבנה',
+    title: title || `ה${noun} שנבנה`,
+    kind,
     topic: '',
     subTopic: '',
     tags: [],
@@ -184,8 +200,8 @@ export function BuildTest({ variant = 'existing-v2', onSend }: {
     const known = test.questions.map(bankQuestionFor).filter(Boolean) as LibraryQuestion[];
     const topics = Array.from(new Set(known.map((k) => k.topic)));
     const units = Array.from(new Set(known.map((k) => k.subTopic)));
-    if (topics.length === 1 && units.length === 1) return `מבחן ב${topics[0]} · ${units[0]}`;
-    if (topics.length === 1) return `מבחן ב${topics[0]}`;
+    if (topics.length === 1 && units.length === 1) return `${noun} ב${topics[0]} · ${units[0]}`;
+    if (topics.length === 1) return `${noun} ב${topics[0]}`;
     return test.title;
   };
   // opening the preview is where a test gets its name, its day and its hours
@@ -200,12 +216,13 @@ export function BuildTest({ variant = 'existing-v2', onSend }: {
     : mode === 'questions' ? draftTest : null;
   // an existing assessment brings its own name; the form's name overrides it when filled in
   const outgoingName = title.trim() || (outgoing && outgoing.id !== 'draft' ? outgoing.title : '');
-  // nothing leaves half-filled: a name, a day, both hours, and at least one question
+  // nothing leaves half-filled: a name, a day, an opening hour, and at least one question.
+  // A תרגול has no closing hour to demand — it stays open until the teacher says otherwise
   const missing = [
-    !outgoingName && 'שם המבחן',
+    !outgoingName && `שם ה${noun}`,
     !date && 'תאריך',
     !opensAt && 'שעת פתיחה',
-    !closesAt && 'שעת סגירה',
+    kind === 'בוחן' && !closesAt && 'שעת סגירה',
     !outgoing?.questions.length && 'שאלות',
   ].filter(Boolean) as string[];
   const [confirmSend, setConfirmSend] = useState(false);
@@ -221,22 +238,23 @@ export function BuildTest({ variant = 'existing-v2', onSend }: {
         {blocked && (
           <NoticeDialog
             title="עוד אי אפשר לשלוח"
-            body={`חסר כדי לשלוח את המבחן:\n${missing.join(', ')}`}
+            body={`חסר כדי לשלוח את ה${noun}:\n${missing.join(', ')}`}
             onClose={() => setBlocked(false)}
           />
         )}
 
         {confirmSend && outgoing && (
           <ConfirmDialog
-            title="לשלוח את המבחן לתלמידים?"
-            // the sentence the teacher checks before the test leaves: when it opens and when it shuts
-            body={`"${outgoingName}" · ${outgoing.questions.length === 1 ? 'שאלה אחת' : `${outgoing.questions.length} שאלות`}\nנפתח ב-${date.slice(0, 5)} בשעה ${opensAt}, ייסגר ב-${closesAt}`}
+            title={`לשלוח את ה${noun} לתלמידים?`}
+            // the sentence the teacher checks before it leaves: when it opens, and when it
+            // shuts — a תרגול without a closing hour just doesn't mention one
+            body={`"${outgoingName}" · ${outgoing.questions.length === 1 ? 'שאלה אחת' : `${outgoing.questions.length} שאלות`}\nנפתח ב-${date.slice(0, 5)} בשעה ${opensAt}${closesAt ? `, ייסגר ב-${closesAt}` : ''}`}
             confirmLabel="שליחה"
             onConfirm={() => {
               onSend({
                 id: `new-${Date.now()}`,
                 title: outgoingName,
-                kind: 'בוחן',
+                kind,
                 topic: outgoing.topic || topic || 'כללי',
                 subTopic: outgoing.subTopic || unit || 'מעורב',
                 tags: outgoing.tags,
@@ -264,6 +282,7 @@ export function BuildTest({ variant = 'existing-v2', onSend }: {
     return (
       <>
         <TestPreview
+          kind={kind}
           // the draft is re-read on every render, so a removal inside it shows at once
           test={previewingDraft ? draftTest : testPreview}
           // the last step of both routes is the same one: send what is on the screen
@@ -287,7 +306,7 @@ export function BuildTest({ variant = 'existing-v2', onSend }: {
     // and the page itself does not move
     <Box sx={split ? { ...fillsPage, minHeight: 0, flex: 1 } : fillsPage}>
     <Stack spacing={3} sx={{ flex: 1, minHeight: 0 }}>
-      <PageHeader icon={<KindIcon kind="בוחן" />} title="בניית מבחן" />
+      <PageHeader icon={<KindIcon kind={kind} />} title={`בניית ${noun}`} />
 
       {/* the first decision: a whole test that exists, or questions picked one by one.
           The tab labels say what this half of the screen is, so it carries no heading */}
@@ -329,6 +348,7 @@ export function BuildTest({ variant = 'existing-v2', onSend }: {
                 <ReadyTestCard
                   key={t.id}
                   t={t}
+                  kind={kind}
                   selected={t.id === openTest?.id}
                   // a click reads the test beside the list instead of leaving the shelf
                   onPreview={() => setOpenId(t.id)}
@@ -345,10 +365,10 @@ export function BuildTest({ variant = 'existing-v2', onSend }: {
                 <CardContent sx={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
                   <Stack spacing={2}>
                     <Stack direction="row" spacing={2} alignItems="center">
-                      <KindIcon kind="בוחן" size="small" />
+                      <KindIcon kind={kind} size="small" />
                       {/* the name is the way out of the pane: it opens the test on the whole screen,
                           exactly as clicking a card does on the other version */}
-                      <Tooltip title="פתיחת המבחן במסך מלא" placement="top" arrow>
+                      <Tooltip title={`פתיחת ה${noun} במסך מלא`} placement="top" arrow>
                         <Link
                           component="button"
                           type="button"
@@ -362,7 +382,7 @@ export function BuildTest({ variant = 'existing-v2', onSend }: {
                         </Link>
                       </Tooltip>
                       {/* a test off the shelf is a closed unit, and says so wherever it is read */}
-                      <ReadyMadeTag kind="בוחן" />
+                      <ReadyMadeTag kind={kind} />
                     </Stack>
                     <Typography sx={META}>
                       {[openTest.topic, openTest.subTopic, openTest.sections.join(', ')].filter(Boolean).join(' · ')}
@@ -392,7 +412,7 @@ export function BuildTest({ variant = 'existing-v2', onSend }: {
         ) : (
         <Stack spacing={2}>
           {readyTests.map((t) => (
-            <ReadyTestCard key={t.id} t={t} onPreview={() => openPreview(t)} />
+            <ReadyTestCard key={t.id} t={t} kind={kind} onPreview={() => openPreview(t)} />
           ))}
         </Stack>
         )

@@ -8,7 +8,7 @@ import CardContent from '@mui/material/CardContent';
 import TextField from '@mui/material/TextField';
 import { FREDOKA } from '../theme';
 import { DateField, TimeSelect } from './DateTimeFields';
-import { KindIcon } from './KindIcon';
+import { KindIcon, type Kind } from './KindIcon';
 import { PageHeader, TaskTitle } from './PageHeader';
 import { ReadyMadeTag } from './ReadyMadeTag';
 import { StickyBar, BarSpacer, fillsPage } from './StickyBar';
@@ -19,6 +19,10 @@ import { type ReadyTest } from './mockData';
 
 // same reading width the screens behind the dialog use (Shell.tsx)
 const CONTENT_MAX_WIDTH = 1120;
+
+// the type's own value is 'בוחן'; every screen actually calls it "מבחן" — the same split
+// ReadyMadeTag already reads by
+const NOUN: Record<Kind, string> = { בוחן: 'מבחן', תרגול: 'תרגול' };
 
 /** when the test opens and closes, exactly as the form was filled in */
 export type TestSchedule = { name: string; date: string; opensAt: string; closesAt: string };
@@ -39,7 +43,9 @@ function SectionTitle({ children }: { children: ReactNode }) {
  * A screen and not a dialog on purpose: the teacher keeps the sidebar, so the preview is a
  * step in the flow rather than a box over it.
  */
-export function TestPreview({ test, schedule, onScheduleChange, action, onRemoveQuestion, readyMade, onClose }: {
+export function TestPreview({ kind, test, schedule, onScheduleChange, action, onRemoveQuestion, readyMade, onClose }: {
+  /** which builder this step belongs to — decides the glyph and every "מבחן"/"תרגול" word */
+  kind: Kind;
   test: ReadyTest;
   /** the form's own line: name, day and hours. Left out, the test's own title stands in. */
   schedule?: TestSchedule;
@@ -61,6 +67,7 @@ export function TestPreview({ test, schedule, onScheduleChange, action, onRemove
   const [openQ, setOpenQ] = useState<number | null>(null);
   const [confirmRemove, setConfirmRemove] = useState<number | null>(null);
   const prompt = openQ === null ? null : test.questions[openQ];
+  const noun = NOUN[kind];
 
   const name = schedule?.name?.trim() || test.title;
   // the three levels, in order: נושא → יחידה → תת נושא
@@ -73,14 +80,14 @@ export function TestPreview({ test, schedule, onScheduleChange, action, onRemove
       <Box sx={{ flex: 1 }}>
         <Box sx={{ maxWidth: CONTENT_MAX_WIDTH, mx: 'auto' }}>
             <Stack spacing={3}>
-              <PageHeader back={{ label: 'חזרה לעריכה', onClick: onClose }} title="בניית מבחן" />
+              <PageHeader back={{ label: 'חזרה לעריכה', onClick: onClose }} title={`בניית ${noun}`} />
 
               {/* the test itself: its glyph, its name, and what it is made of */}
               <TaskTitle
-                icon={<KindIcon kind="בוחן" />}
+                icon={<KindIcon kind={kind} />}
                 name={name}
                 // the same tag the task editor shows: this one was built as a closed unit
-                after={readyMade ? <ReadyMadeTag kind="בוחן" /> : undefined}
+                after={readyMade ? <ReadyMadeTag kind={kind} /> : undefined}
                 meta={[curriculum, `${test.questions.length} שאלות`].filter(Boolean).join(' · ')}
               />
 
@@ -88,27 +95,33 @@ export function TestPreview({ test, schedule, onScheduleChange, action, onRemove
                   only about what goes into it */}
               {schedule && onScheduleChange && (
                 <>
-                  <SectionTitle>פרטי המבחן</SectionTitle>
+                  <SectionTitle>פרטי ה{noun}</SectionTitle>
                   <Card variant="outlined" sx={{ borderRadius: 2 }}>
                     <CardContent>
                       <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap>
                         <TextField
-                          label="שם המבחן"
-                          placeholder="הכנס שם מבחן…"
+                          label={`שם ה${noun}`}
+                          placeholder={`הכנס שם ${noun}…`}
                           value={schedule.name}
                           onChange={(e) => onScheduleChange.setName(e.target.value)}
                           sx={{ flex: 2, minWidth: 260 }}
                         />
                         <DateField value={schedule.date} onChange={onScheduleChange.setDate} sx={{ flex: 1, minWidth: 180 }} />
                         <TimeSelect label="שעת פתיחה" value={schedule.opensAt} onChange={onScheduleChange.setOpensAt} sx={{ width: 150 }} />
-                        <TimeSelect label="שעת סגירה" value={schedule.closesAt} onChange={onScheduleChange.setClosesAt} sx={{ width: 150 }} />
+                        {/* a תרגול does not have to close — a בוחן always does */}
+                        <TimeSelect
+                          label={kind === 'תרגול' ? 'שעת סגירה (אופציונלי)' : 'שעת סגירה'}
+                          value={schedule.closesAt}
+                          onChange={onScheduleChange.setClosesAt}
+                          sx={{ width: 150 }}
+                        />
                       </Stack>
                     </CardContent>
                   </Card>
                 </>
               )}
 
-              <SectionTitle>שאלות המבחן ({test.questions.length})</SectionTitle>
+              <SectionTitle>שאלות ה{noun} ({test.questions.length})</SectionTitle>
               <Stack spacing={2}>
                 {test.questions.map((q, i) => (
                   <QuestionCard
@@ -158,7 +171,7 @@ export function TestPreview({ test, schedule, onScheduleChange, action, onRemove
       {confirmRemove !== null && (
         <ConfirmDeleteDialog
           title={`להסיר את שאלה ${confirmRemove + 1}?`}
-          body="השאלה תוסר מהמבחן. אפשר יהיה לבחור אותה שוב מהטבלה."
+          body={`השאלה תוסר מה${noun}. אפשר יהיה לבחור אותה שוב מהטבלה.`}
           confirmLabel="הסרה"
           onConfirm={() => { onRemoveQuestion?.(confirmRemove); setConfirmRemove(null); }}
           onClose={() => setConfirmRemove(null)}

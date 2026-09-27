@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import Box from '@mui/material/Box';
-import { Shell, NAV, type Screen, type NavKey } from './dashboard/Shell';
+import { Shell, type Screen, type NavKey } from './dashboard/Shell';
 import { TeacherMain } from './dashboard/TeacherMain';
 import { StudentsStatus, type StudentsVariant } from './dashboard/StudentsStatus';
 import { AssessmentReview, type ReviewVariant } from './dashboard/AssessmentReview';
@@ -41,6 +41,14 @@ const SCREEN_VARIANTS: Partial<Record<Screen, ScreenVariant[]>> = {
     { key: 'questions', label: 'pick questions' },
     { key: 'picked', label: 'questions picked' },
     { key: 'preview', label: 'test preview' },
+  ],
+  // בניית תרגול is the same screen as בניית מבחן, just with kind="תרגול" — see BuildTest.tsx
+  'build-practice': [
+    { key: 'existing-v2', label: 'split view' },
+    { key: 'existing', label: 'ready practices' },
+    { key: 'questions', label: 'pick questions' },
+    { key: 'picked', label: 'questions picked' },
+    { key: 'preview', label: 'practice preview' },
   ],
 };
 
@@ -111,7 +119,7 @@ export function App() {
             active={screen === 'assessment-review' || screen === 'scheduled-task' ? 'results' : screen}
             onNavigate={navigate}
             // the split view scrolls its two halves itself, so the page must not scroll too
-            fill={screen === 'build-test' && variant === 'existing-v2'}
+            fill={(screen === 'build-test' || screen === 'build-practice') && variant === 'existing-v2'}
           >
             {screen === 'main' ? (
               <TeacherMain
@@ -151,17 +159,20 @@ export function App() {
                   setToast({ text: `${scheduled.kind === 'בוחן' ? 'המבחן' : 'התרגול'} נמחק`, severity: 'info' });
                 }}
               />
-            ) : screen === 'build-test' ? (
+            ) : screen === 'build-test' || screen === 'build-practice' ? (
               <BuildTest
+                // one screen behind both nav items — only the kind differs
+                kind={screen === 'build-test' ? 'בוחן' : 'תרגול'}
                 // each demo state opens the screen clean, so switching states never leaves
                 // a half-filled form behind
-                key={variant}
+                key={`${screen}-${variant}`}
                 variant={variant as BuildTestVariant}
-                // a sent test joins כל ההערכות as a scheduled one, and the screen follows it there
+                // a sent test/practice joins כל ההערכות as a scheduled one, and the screen
+                // follows it there
                 onSend={(next) => {
                   setAssessments([next, ...assessments]);
                   setScreen('results');
-                  setToast({ text: 'המבחן נשלח' });
+                  setToast({ text: `${next.kind === 'בוחן' ? 'המבחן' : 'התרגול'} נשלח` });
                   pointAt(next.id);
                 }}
               />
@@ -181,7 +192,10 @@ export function App() {
                 }}
               />
             ) : (
-              <BlankScreen title={NAV.find((n) => n.key === screen)!.label} />
+              // only reachable if scheduledId points at a task that no longer exists — NAV has
+              // no entry for 'scheduled-task' to look a label up from, so fall back plainly
+              // instead of crashing on that lookup
+              <BlankScreen title="כל ההערכות" />
             )}
           </Shell>
         </Box>
