@@ -11,6 +11,7 @@ import CloseRounded from '@mui/icons-material/CloseRounded';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { useTheme } from '@mui/material/styles';
 import { QuestionDetail, QuestionHeading } from './QuestionDetail';
+import { NICE_SCROLLBAR } from './scrollbar';
 
 /**
  * One question, opened in full, in the app's detail layout: title, the question, a rule, the
@@ -60,7 +61,7 @@ export function QuestionPreviewDialog({ prompt, index, selected = false, onToggl
           </IconButton>
         </Stack>
       </DialogTitle>
-      <DialogContent>
+      <DialogContent sx={NICE_SCROLLBAR}>
         <QuestionDetail prompt={prompt} />
       </DialogContent>
     </Dialog>

@@ -44,6 +44,7 @@ import { QNumber } from './QNumber';
 import { LabeledPill, DifficultyPill } from './Pills';
 import { ClampedText } from './ClampedText';
 import { EmptyState } from './EmptyState';
+import { NICE_SCROLLBAR } from './scrollbar';
 import {
   CLASS_SIZE, ASSESSMENT_REVIEWS, ASSESSMENT_QUESTIONS, blankAssessment, blankQuestions,
   type StudentResult, type ReviewQuestion, type QuestionAnswer, type AnswerTurn,
@@ -607,7 +608,7 @@ function QuestionDialog({ q, index, onClose }: { q: ReviewQuestion; index: numbe
         )}
       </DialogTitle>
 
-      <DialogContent dividers>
+      <DialogContent dividers sx={NICE_SCROLLBAR}>
         {open ? (
           /* one student, everything that happened in this question */
           <Stack spacing={2.5}>

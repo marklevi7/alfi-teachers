@@ -34,18 +34,16 @@ const SCREEN_VARIANTS: Partial<Record<Screen, ScreenVariant[]>> = {
     { key: 'empty', label: 'blank' },
   ],
   'build-test': [
-    // split view is the real default now — a teacher lands here reading a test, not just
+    // the shelf is always the split view — a teacher lands here reading a test, not just
     // scanning a list of titles
-    { key: 'existing-v2', label: 'split view' },
-    { key: 'existing', label: 'ready tests' },
+    { key: 'existing', label: 'split view' },
     { key: 'questions', label: 'pick questions' },
     { key: 'picked', label: 'questions picked' },
     { key: 'preview', label: 'test preview' },
   ],
   // בניית תרגול is the same screen as בניית מבחן, just with kind="תרגול" — see BuildTest.tsx
   'build-practice': [
-    { key: 'existing-v2', label: 'split view' },
-    { key: 'existing', label: 'ready practices' },
+    { key: 'existing', label: 'split view' },
     { key: 'questions', label: 'pick questions' },
     { key: 'picked', label: 'questions picked' },
     { key: 'preview', label: 'practice preview' },
@@ -118,8 +116,8 @@ export function App() {
           <Shell
             active={screen === 'assessment-review' || screen === 'scheduled-task' ? 'results' : screen}
             onNavigate={navigate}
-            // the split view scrolls its two halves itself, so the page must not scroll too
-            fill={(screen === 'build-test' || screen === 'build-practice') && variant === 'existing-v2'}
+            // the builders scroll their own halves and lists, so the page must not scroll too
+            fill={screen === 'build-test' || screen === 'build-practice'}
           >
             {screen === 'main' ? (
               <TeacherMain

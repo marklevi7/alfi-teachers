@@ -26,7 +26,8 @@ import { QuestionCard } from './TestQuestionCard';
 import { QuestionFilters, NO_FILTERS, matchesFilters } from './QuestionFilters';
 import { ReadyMadeTag } from './ReadyMadeTag';
 import { PageHeader } from './PageHeader';
-import { StickyBar, BarSpacer, fillsPage } from './StickyBar';
+import { StickyBar, BarSpacer } from './StickyBar';
+import { NICE_SCROLLBAR } from './scrollbar';
 
 
 const pad2 = (n: number) => String(n).padStart(2, '0');
@@ -110,7 +111,7 @@ function ReadyTestCard({ t, kind, onPreview, selected = false }: {
 /** The demo states of this screen, switched from the dev control bar: the two routes into
     the questions, the assembly route with questions already on it, and the step that reads
     a whole test. The screen is remounted on a switch, so each state opens clean. */
-export type BuildTestVariant = 'existing' | 'existing-v2' | 'questions' | 'picked' | 'preview';
+export type BuildTestVariant = 'existing' | 'questions' | 'picked' | 'preview';
 
 /** the questions a 'picked' demo opens with — the first few the library offers */
 const DEMO_PICKS = 3;
@@ -120,7 +121,7 @@ const firstReadyOf = (kind: Kind) => READY_TESTS.find((t) => t.kind === kind) ??
 
 /** בניית מבחן / בניית תרגול — the form, then one of two routes to the questions, then out to
     the class. One component behind both screens: only the kind and its wording differ. */
-export function BuildTest({ kind, variant = 'existing-v2', onSend }: {
+export function BuildTest({ kind, variant = 'existing', onSend }: {
   /** which builder this is — decides the glyph, every "מבחן"/"תרגול" word, and which ready
       assessments the shelf offers */
   kind: Kind;
@@ -133,9 +134,10 @@ export function BuildTest({ kind, variant = 'existing-v2', onSend }: {
   // a new test opens today unless the teacher says otherwise
   const [date, setDate] = useState(todayAppDate);
   // a test opens now and runs an hour, unless the teacher moves either end. A תרגול has no
-  // closing time by default — it stays open until the teacher decides otherwise
+  // closing time or date by default — it stays open until the teacher decides otherwise
   const [opensAt, setOpensAt] = useState(() => clockPlus(0));
   const [closesAt, setClosesAt] = useState(() => (kind === 'תרגול' ? '' : clockPlus(1)));
+  const [closesOn, setClosesOn] = useState('');
   // what the test is made of: every question ticked in the table below
   const [picked, setPicked] = useState<string[]>(
     () => (variant === 'picked' ? QUESTION_LIBRARY.slice(0, DEMO_PICKS).map((q) => q.id) : []),
@@ -147,8 +149,6 @@ export function BuildTest({ kind, variant = 'existing-v2', onSend }: {
   const [mode, setMode] = useState<Mode>(
     variant === 'questions' || variant === 'picked' ? 'questions' : 'existing',
   );
-  // the shelf's second design: the list on one half, the test it opens on the other
-  const split = variant === 'existing-v2';
   // which test the reading pane is showing; the first one on the shelf until another is clicked
   const [openId, setOpenId] = useState<string | null>(null);
   // a question read in full, without having to pick it first
@@ -247,8 +247,13 @@ export function BuildTest({ kind, variant = 'existing-v2', onSend }: {
           <ConfirmDialog
             title={`לשלוח את ה${noun} לתלמידים?`}
             // the sentence the teacher checks before it leaves: when it opens, and when it
-            // shuts — a תרגול without a closing hour just doesn't mention one
-            body={`"${outgoingName}" · ${outgoing.questions.length === 1 ? 'שאלה אחת' : `${outgoing.questions.length} שאלות`}\nנפתח ב-${date.slice(0, 5)} בשעה ${opensAt}${closesAt ? `, ייסגר ב-${closesAt}` : ''}`}
+            // shuts — a תרגול without a closing date or hour just doesn't mention one, and a
+            // closing date only shows up when it differs from the opening day
+            body={`"${outgoingName}" · ${outgoing.questions.length === 1 ? 'שאלה אחת' : `${outgoing.questions.length} שאלות`}\nנפתח ב-${date.slice(0, 5)} בשעה ${opensAt}${
+              closesOn || closesAt
+                ? `, ייסגר ${[closesOn && `ב-${closesOn.slice(0, 5)}`, closesAt && `בשעה ${closesAt}`].filter(Boolean).join(' ')}`
+                : ''
+            }`}
             confirmLabel="שליחה"
             onConfirm={() => {
               onSend({
@@ -261,6 +266,7 @@ export function BuildTest({ kind, variant = 'existing-v2', onSend }: {
                 opensOn: date,
                 opensAt,
                 closesAt,
+                closesOn,
                 state: 'scheduled',
                 // only a borrowed bank needs an index; this task carries its own questions
                 reviewIndex: 0,
@@ -286,8 +292,8 @@ export function BuildTest({ kind, variant = 'existing-v2', onSend }: {
           // the draft is re-read on every render, so a removal inside it shows at once
           test={previewingDraft ? draftTest : testPreview}
           // the last step of both routes is the same one: send what is on the screen
-          schedule={{ name: title, date, opensAt, closesAt }}
-          onScheduleChange={{ setName: setTitle, setDate, setOpensAt, setClosesAt }}
+          schedule={{ name: title, date, opensAt, closesAt, closesOn }}
+          onScheduleChange={{ setName: setTitle, setDate, setOpensAt, setClosesAt, setClosesOn }}
           action={{ label: 'שליחה לתלמידים', onClick: send }}
           // only a test being assembled can lose a question here
           onRemoveQuestion={previewingDraft ? (i: number) => setPicked(picked.filter((_, k) => k !== i)) : undefined}
@@ -301,11 +307,24 @@ export function BuildTest({ kind, variant = 'existing-v2', onSend }: {
   }
 
   return (
-    // the screen fills the page, so the bar below it always lands on the bottom edge. The
-    // split view goes further and takes exactly the page: its two halves scroll inside it,
-    // and the page itself does not move
-    <Box sx={split ? { ...fillsPage, minHeight: 0, flex: 1 } : fillsPage}>
-    <Stack spacing={3} sx={{ flex: 1, minHeight: 0 }}>
+    // the screen takes exactly the page and nothing below it moves: the shelf scrolls its two
+    // halves, the question list scrolls itself, and the bar below both stays on the bottom edge
+    <Box sx={{ height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+    <Stack
+      spacing={3}
+      sx={{
+        flex: 1,
+        minHeight: 0,
+        // the shelf manages its own scrolling; the question list scrolls as one column, and
+        // nothing in that column is allowed to be squeezed to fit — it scrolls instead
+        ...(mode === 'questions' && {
+          overflowY: 'auto',
+          pb: 1,
+          '& > *': { flexShrink: 0 },
+          ...NICE_SCROLLBAR,
+        }),
+      }}
+    >
       <PageHeader icon={<KindIcon kind={kind} />} title={`בניית ${noun}`} />
 
       {/* the first decision: a whole test that exists, or questions picked one by one.
@@ -333,16 +352,15 @@ export function BuildTest({ kind, variant = 'existing-v2', onSend }: {
             />
           </Card>
         ) : (
-        split ? (
-          // v2, the mail-client split: the shelf on one half, what a card holds on the other
-          // the two halves fill what is left of the page and scroll on their own, the way a
+          // the mail-client split: the shelf on one half, what a card holds on the other.
+          // The two halves fill what is left of the page and scroll on their own, the way a
           // mail client's list and reading pane do
           // the reading pane is where the teacher actually reads a test, so it gets the
           // larger half — the shelf only has to fit a title and a line of meta per row
           <Box sx={{ flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: { xs: '1fr', md: '2fr 3fr' }, gap: 2 }}>
             {/* the shelf scrolls inside its own half — a plain block scroller, so the cards
                 keep their height instead of being squeezed by the flex column */}
-            <Box sx={{ minHeight: 0, overflowY: 'auto', pb: 1 }}>
+            <Box sx={{ minHeight: 0, overflowY: 'auto', pb: 1, ...NICE_SCROLLBAR }}>
             <Stack spacing={2}>
               {readyTests.map((t) => (
                 <ReadyTestCard
@@ -362,7 +380,7 @@ export function BuildTest({ kind, variant = 'existing-v2', onSend }: {
               sx={{ borderRadius: 3, minHeight: 0, display: 'flex', flexDirection: 'column' }}
             >
               {openTest && (
-                <CardContent sx={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+                <CardContent sx={{ flex: 1, minHeight: 0, overflowY: 'auto', ...NICE_SCROLLBAR }}>
                   <Stack spacing={2}>
                     <Stack direction="row" spacing={2} alignItems="center">
                       <KindIcon kind={kind} size="small" />
@@ -409,13 +427,6 @@ export function BuildTest({ kind, variant = 'existing-v2', onSend }: {
               )}
             </Card>
           </Box>
-        ) : (
-        <Stack spacing={2}>
-          {readyTests.map((t) => (
-            <ReadyTestCard key={t.id} t={t} kind={kind} onPreview={() => openPreview(t)} />
-          ))}
-        </Stack>
-        )
         )
       ) : (
       <>

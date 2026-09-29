@@ -25,7 +25,14 @@ const CONTENT_MAX_WIDTH = 1120;
 const NOUN: Record<Kind, string> = { בוחן: 'מבחן', תרגול: 'תרגול' };
 
 /** when the test opens and closes, exactly as the form was filled in */
-export type TestSchedule = { name: string; date: string; opensAt: string; closesAt: string };
+export type TestSchedule = {
+  name: string;
+  date: string;
+  opensAt: string;
+  closesAt: string;
+  /** a תרגול only — a closing date apart from the day it opens. Undefined for a בוחן. */
+  closesOn?: string;
+};
 
 function SectionTitle({ children }: { children: ReactNode }) {
   return (
@@ -55,6 +62,8 @@ export function TestPreview({ kind, test, schedule, onScheduleChange, action, on
     setDate: (v: string) => void;
     setOpensAt: (v: string) => void;
     setClosesAt: (v: string) => void;
+    /** only wired up for a תרגול — a בוחן has no closing date of its own */
+    setClosesOn?: (v: string) => void;
   };
   /** the one thing this preview commits to, on the bar at the bottom */
   action?: { label: string; icon?: ReactNode; onClick: () => void };
@@ -98,23 +107,50 @@ export function TestPreview({ kind, test, schedule, onScheduleChange, action, on
                   <SectionTitle>פרטי ה{noun}</SectionTitle>
                   <Card variant="outlined" sx={{ borderRadius: 2 }}>
                     <CardContent>
-                      <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap>
+                      <Stack spacing={2.5}>
+                        {/* the name reads best on its own line — the date/time row already
+                            carries four fields, and a fifth wrapping in beside the name made
+                            both rows look accidental */}
                         <TextField
                           label={`שם ה${noun}`}
                           placeholder={`הכנס שם ${noun}…`}
                           value={schedule.name}
                           onChange={(e) => onScheduleChange.setName(e.target.value)}
-                          sx={{ flex: 2, minWidth: 260 }}
+                          fullWidth
                         />
-                        <DateField value={schedule.date} onChange={onScheduleChange.setDate} sx={{ flex: 1, minWidth: 180 }} />
-                        <TimeSelect label="שעת פתיחה" value={schedule.opensAt} onChange={onScheduleChange.setOpensAt} sx={{ width: 150 }} />
-                        {/* a תרגול does not have to close — a בוחן always does */}
-                        <TimeSelect
-                          label={kind === 'תרגול' ? 'שעת סגירה (אופציונלי)' : 'שעת סגירה'}
-                          value={schedule.closesAt}
-                          onChange={onScheduleChange.setClosesAt}
-                          sx={{ width: 150 }}
-                        />
+                        {/* a תרגול's four fields grow to fill the row themselves; a בוחן's
+                            three sit at fixed widths and pack at the row's start instead of
+                            stretching thin across it */}
+                        <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap>
+                          <DateField
+                            value={schedule.date}
+                            onChange={onScheduleChange.setDate}
+                            sx={kind === 'תרגול' ? { flex: 1, minWidth: 160 } : { width: 180 }}
+                          />
+                          <TimeSelect
+                            label="שעת פתיחה"
+                            value={schedule.opensAt}
+                            onChange={onScheduleChange.setOpensAt}
+                            sx={kind === 'תרגול' ? { flex: 1, minWidth: 130 } : { width: 150 }}
+                          />
+                          {/* a תרגול can close on a later date than it opens — a בוחן always
+                              closes the day it opens, so it never shows this field at all */}
+                          {kind === 'תרגול' && onScheduleChange.setClosesOn && (
+                            <DateField
+                              label="תאריך סגירה (אופציונלי)"
+                              value={schedule.closesOn ?? ''}
+                              onChange={onScheduleChange.setClosesOn}
+                              sx={{ flex: 1, minWidth: 160 }}
+                            />
+                          )}
+                          {/* a תרגול does not have to close — a בוחן always does */}
+                          <TimeSelect
+                            label={kind === 'תרגול' ? 'שעת סגירה (אופציונלי)' : 'שעת סגירה'}
+                            value={schedule.closesAt}
+                            onChange={onScheduleChange.setClosesAt}
+                            sx={kind === 'תרגול' ? { flex: 1, minWidth: 130 } : { width: 150 }}
+                          />
+                        </Stack>
                       </Stack>
                     </CardContent>
                   </Card>

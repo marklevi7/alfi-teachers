@@ -18,6 +18,7 @@ import { QuestionPickCard } from './QuestionPickCard';
 import { QuestionPreviewDialog } from './QuestionPreviewDialog';
 import { QUESTION_LIBRARY, type LibraryQuestion } from './mockData';
 import { QuestionFilters, NO_FILTERS, matchesFilters } from './QuestionFilters';
+import { NICE_SCROLLBAR } from './scrollbar';
 
 /* ---------- the library ---------- */
 
@@ -64,7 +65,7 @@ export function QuestionLibrary({ inUse = [], onPick, onClose }: {
         </IconButton>
       </DialogTitle>
 
-      <DialogContent dividers>
+      <DialogContent dividers sx={NICE_SCROLLBAR}>
         {/* the app's one filter box, shared with בניית מבחן */}
         <QuestionFilters value={filters} onChange={setFilters} mb={3} />
 

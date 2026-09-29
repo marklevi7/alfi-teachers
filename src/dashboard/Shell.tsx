@@ -15,6 +15,7 @@ import AssignmentTurnedInRounded from '@mui/icons-material/AssignmentTurnedInRou
 import LogoutRounded from '@mui/icons-material/LogoutRounded';
 import { AlfiWordmark } from '../components/AlfiWordmark';
 import { FREDOKA } from '../theme';
+import { NICE_SCROLLBAR } from './scrollbar';
 
 // ניהול משימות is gone as its own screen — it merges into תוצאות הערכות, which inherits
 // its icon (decided on the 23 Aug kickoff call).
@@ -122,7 +123,7 @@ export function Shell({ active, onNavigate, fill = false, children }: {
       {/* The one and only scrollbar in the app. A scroll container insets sticky children
           by its own padding, so the vertical padding lives on the column inside instead —
           otherwise a sticky table header parks 48px down and rows show through the gap. */}
-      <Box component="main" sx={{ flexGrow: 1, minWidth: 0, height: '100%', overflowY: 'auto', px: 6 }}>
+      <Box component="main" sx={{ flexGrow: 1, minWidth: 0, height: '100%', overflowY: 'auto', px: 6, ...NICE_SCROLLBAR }}>
         {/* a flex column at least as tall as the page. `fill` makes it exactly the page, so a
             screen inside it can ask for `flex: 1` and scroll its own panes */}
         <Box

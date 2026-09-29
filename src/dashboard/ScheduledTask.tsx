@@ -31,6 +31,7 @@ import { QuestionLibrary } from './QuestionLibrary';
 import { ConfirmDeleteDialog } from './ConfirmDialog';
 import { EmptyState } from './EmptyState';
 import { DateField, TimeSelect } from './DateTimeFields';
+import { NICE_SCROLLBAR } from './scrollbar';
 import Checkbox from '@mui/material/Checkbox';
 import ListItemText from '@mui/material/ListItemText';
 import {
@@ -98,6 +99,8 @@ export function ScheduledTask({ task, onBack, onSave, onDelete }: {
   const [opensOn, setOpensOn] = useState(task.opensOn);
   const [opensAt, setOpensAt] = useState(task.opensAt ?? '');
   const [closesAt, setClosesAt] = useState(task.closesAt ?? '');
+  // a תרגול only — a closing date apart from the day it opens
+  const [closesOn, setClosesOn] = useState(task.closesOn ?? '');
   const [topic, setTopic] = useState(task.topic);
   const [subTopic, setSubTopic] = useState(task.subTopic);
   const [sections, setSections] = useState<string[]>(() => sectionsOfAssessment(task));
@@ -157,18 +160,45 @@ export function ScheduledTask({ task, onBack, onSave, onDelete }: {
       <Card variant="outlined" sx={{ borderRadius: 2 }}>
         <CardContent>
           <Stack spacing={2.5}>
-            {/* the basic line: what it is called, on what day, and between which hours */}
+            {/* the name reads best on its own line — the date/time row already carries four
+                fields, and a fifth wrapping in beside the name made both rows look accidental */}
+            <TextField
+              label="שם המשימה"
+              placeholder="הכנס שם משימה…"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              fullWidth
+            />
+            {/* a תרגול's four fields grow to fill the row themselves; a בוחן's three sit at
+                fixed widths and pack at the row's start instead of stretching thin across it */}
             <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap>
-              <TextField
-                label="שם המשימה"
-                placeholder="הכנס שם משימה…"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                sx={{ flex: 2, minWidth: 260 }}
+              <DateField
+                value={opensOn}
+                onChange={setOpensOn}
+                sx={task.kind === 'תרגול' ? { flex: 1, minWidth: 160 } : { width: 180 }}
               />
-              <DateField value={opensOn} onChange={setOpensOn} sx={{ flex: 1, minWidth: 180 }} />
-              <TimeSelect label="שעת פתיחה" value={opensAt} onChange={setOpensAt} sx={{ width: 150 }} />
-              <TimeSelect label="שעת סגירה" value={closesAt} onChange={setClosesAt} sx={{ width: 150 }} />
+              <TimeSelect
+                label="שעת פתיחה"
+                value={opensAt}
+                onChange={setOpensAt}
+                sx={task.kind === 'תרגול' ? { flex: 1, minWidth: 130 } : { width: 150 }}
+              />
+              {/* a תרגול can close on a later date than it opened — a בוחן always closes the
+                  day it opens, so it never shows this field at all */}
+              {task.kind === 'תרגול' && (
+                <DateField
+                  label="תאריך סגירה (אופציונלי)"
+                  value={closesOn}
+                  onChange={setClosesOn}
+                  sx={{ flex: 1, minWidth: 160 }}
+                />
+              )}
+              <TimeSelect
+                label={task.kind === 'תרגול' ? 'שעת סגירה (אופציונלי)' : 'שעת סגירה'}
+                value={closesAt}
+                onChange={setClosesAt}
+                sx={task.kind === 'תרגול' ? { flex: 1, minWidth: 130 } : { width: 150 }}
+              />
             </Stack>
             <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap>
               {/* the same three levels the rest of the app files a task under, in order */}
@@ -329,7 +359,7 @@ export function ScheduledTask({ task, onBack, onSave, onDelete }: {
               </IconButton>
             </Stack>
           </DialogTitle>
-          <DialogContent>
+          <DialogContent sx={NICE_SCROLLBAR}>
             <QuestionDetail prompt={questions[reading]} />
           </DialogContent>
         </Dialog>
@@ -382,7 +412,7 @@ export function ScheduledTask({ task, onBack, onSave, onDelete }: {
         )}
         <Button
           variant="contained"
-          onClick={() => onSave({ ...task, title, opensOn, opensAt, closesAt, topic, subTopic, sections, tags })}
+          onClick={() => onSave({ ...task, title, opensOn, opensAt, closesAt, closesOn, topic, subTopic, sections, tags })}
           sx={{ fontWeight: 800 }}
         >
           שמירה

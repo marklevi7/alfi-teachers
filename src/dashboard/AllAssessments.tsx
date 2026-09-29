@@ -147,8 +147,10 @@ function AssessmentRow({ a, highlight = false, onOpen, onEdit, onDelete }: {
                 {/* each state says the hour that matters: when it will open, when it opened,
                     and — once it is over — when it closed */}
                 <Typography sx={{ ...META, whiteSpace: 'nowrap' }}>
+                  {/* a תרגול can close on a later date than it opened — fall back to the
+                      opening date only when no closing date of its own was set */}
                   {a.state === 'ended'
-                    ? `נסגר ב־${a.opensOn}${a.closesAt ? ` בשעה ${a.closesAt}` : ''}`
+                    ? `נסגר ב־${a.closesOn || a.opensOn}${a.closesAt ? ` בשעה ${a.closesAt}` : ''}`
                     : `${queued ? 'ייפתח ב־' : 'נפתח ב־'}${a.opensOn}${a.opensAt ? ` בשעה ${a.opensAt}` : ''}`}
                 </Typography>
               </Stack>

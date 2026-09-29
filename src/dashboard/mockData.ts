@@ -528,6 +528,9 @@ export type ClassAssessment = {
   // them empty rather than inventing an hour the school never chose.
   opensAt?: string;
   closesAt?: string;
+  // a תרגול can close on a later date than it opens — a בוחן always closes the day it opens,
+  // so this stays unset for one and is only ever read next to closesAt for the other
+  closesOn?: string;
   // a task built in בניית מבחן brings its own questions; the seeded ones borrow a bank by
   // reviewIndex, which is what the editor falls back to
   questions?: string[];
