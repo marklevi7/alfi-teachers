@@ -1,7 +1,7 @@
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
 import MenuBookRounded from '@mui/icons-material/MenuBookRounded';
-import AssignmentRounded from '@mui/icons-material/AssignmentRounded';
+import TimerRounded from '@mui/icons-material/TimerRounded';
 import { PageHeader } from './PageHeader';
 import { MainDashboard, type MainVariant } from './MainDashboard';
 
@@ -13,7 +13,7 @@ export function TeacherMain({ variant = 'mid', onOpenAssessment }: { variant?: M
         title="שלום רבקה כהן"
         actions={
           <Stack direction="row" spacing={2}>
-            <Button variant="contained" startIcon={<AssignmentRounded />}>
+            <Button variant="contained" startIcon={<TimerRounded />}>
               צור מבחן חדש
             </Button>
             <Button variant="outlined" startIcon={<MenuBookRounded />}>

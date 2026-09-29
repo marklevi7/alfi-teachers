@@ -9,7 +9,7 @@ import TextField from '@mui/material/TextField';
 import MenuItem from '@mui/material/MenuItem';
 import SchoolRounded from '@mui/icons-material/SchoolRounded';
 import ShowChartRounded from '@mui/icons-material/ShowChartRounded';
-import AssignmentRounded from '@mui/icons-material/AssignmentRounded';
+import TimerRounded from '@mui/icons-material/TimerRounded';
 import MenuBookRounded from '@mui/icons-material/MenuBookRounded';
 import AssignmentTurnedInRounded from '@mui/icons-material/AssignmentTurnedInRounded';
 import LogoutRounded from '@mui/icons-material/LogoutRounded';
@@ -27,7 +27,8 @@ export type NavKey = Exclude<Screen, 'assessment-review' | 'scheduled-task'>;
 export const NAV: { key: NavKey; label: string; icon: ReactNode }[] = [
   { key: 'main', label: 'מסך ראשי', icon: <SchoolRounded /> },
   { key: 'students', label: 'מצב התלמידים', icon: <ShowChartRounded /> },
-  { key: 'build-test', label: 'בניית מבחן', icon: <AssignmentRounded /> },
+  // a מבחן wears the stopwatch everywhere in the app — the nav says the same thing
+  { key: 'build-test', label: 'בניית מבחן', icon: <TimerRounded /> },
   { key: 'build-practice', label: 'בניית תרגול', icon: <MenuBookRounded /> },
   { key: 'results', label: 'כל ההערכות', icon: <AssignmentTurnedInRounded /> },
 ];
